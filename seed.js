@@ -1,34 +1,58 @@
-const mongoose = require("mongoose");
-const Product = require("./models/Product");
-const Category = require("./models/Category");
-const Menu = require("./models/Menu");
-const User = require("./models/User");
+const mongoose = require('mongoose');
+const User = require('./models/User');
+const Table = require('./models/Table');
+const Product = require('./models/Product');
+const Category = require('./models/Category');
+const Menu = require('./models/Menu');
+const Order = require('./models/Order');
 
-async function addNewCategoriesAndProductsForUser(email) {
+async function seedDatabase() {
   try {
-    // Connect to the database
-    await mongoose.connect(
-      "mongodb+srv://saadliwissem88:12715083w@cafein.ctsilpo.mongodb.net/?retryWrites=true&w=majority&appName=CafeIn",
+    await mongoose.connect('mongodb+srv://saadliwissem88:12715083w@cafein.ctsilpo.mongodb.net/?retryWrites=true&w=majority&appName=CafeIn', {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
+    // Clear the existing collections
+    await User.deleteMany({});
+    await Table.deleteMany({});
+    await Product.deleteMany({});
+    await Category.deleteMany({});
+    await Menu.deleteMany({});
+    await Order.deleteMany({});
+
+    // Create users
+    const users = await User.insertMany([
+      { fullName: "John Doe", email: "john@example.com", password: "password", verificationCode: "12345", role: "client" },
+      { fullName: "Jane Smith", email: "jane@example.com", password: "password", verificationCode: "54321", role: "client" },
+    ]);
+
+    // Create tables
+    const tables = await Table.insertMany([
+      { number: 1, user: users[0]._id },
+      { number: 2, user: users[1]._id },
+    ]);
+
+    // Create products
+    const products = await Product.insertMany([
       {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      }
-    );
-
-    // Find the user by email
-    const user = await User.findOne({ email });
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // Find the menu associated with the user
-    const menu = await Menu.findOne({ user: user._id });
-    if (!menu) {
-      throw new Error("Menu not found");
-    }
-
-    // Create new products
-    const newProducts = [
+        name: "Veg Mixer",
+        description: "Tomato Salad & Carrot",
+        price: 5.99,
+        rate: 5.0,
+        raters: 87,
+        img: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=500&q=80",
+        available: true,
+      },
+      {
+        name: "Macaroni",
+        description: "Cheese Pizza",
+        price: 2.99,
+        rate: 4.8,
+        raters: 32,
+        img: "https://images.unsplash.com/photo-1432139555190-58524dae6a55?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=500&q=80",
+        available: true,
+      },
       {
         name: "Chicken Wings",
         description: "Spicy Chicken Wings",
@@ -47,30 +71,41 @@ async function addNewCategoriesAndProductsForUser(email) {
         img: "https://images.unsplash.com/photo-1597308698434-d0cdd6c8b8b3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=MnwxMTc3M3wwfDF8c2VhcmNofDJ8fGJlZWYlMjBidXJnZXJ8ZW58MHx8fHwxNjI1NDQzMzM5&ixlib=rb-1.2.1&q=80&w=400",
         available: true,
       },
-    ];
-    const insertedNewProducts = await Product.insertMany(newProducts);
+    ]);
 
-    // Create new categories
-    const newCategories = [
-      { name: "Mains", products: insertedNewProducts.map((p) => p._id) },
-    ];
-    const insertedNewCategories = await Category.insertMany(newCategories);
+    // Create categories
+    const categories = await Category.insertMany([
+      { name: "Starters", products: [products[0]._id, products[1]._id] },
+      { name: "Mains", products: [products[2]._id, products[3]._id] },
+    ]);
 
-    // Update the menu to include the new categories
-    menu.categories = menu.categories.concat(
-      insertedNewCategories.map((c) => c._id)
-    );
-    await menu.save();
+    // Create menus
+    const menus = await Menu.insertMany([
+      { categories: [categories[0]._id, categories[1]._id], user: users[0]._id },
+      { categories: [categories[0]._id, categories[1]._id], user: users[1]._id },
+    ]);
 
-    console.log("New categories and products added successfully!");
+    // Create orders
+    const orders = await Order.insertMany([
+      {
+        products: [{ product: products[0]._id, quantity: 2 }],
+        table: tables[0]._id,
+        totalPrice: products[0].price * 2,
+      },
+      {
+        products: [{ product: products[1]._id, quantity: 1 }],
+        table: tables[1]._id,
+        totalPrice: products[1].price,
+      },
+    ]);
 
-    // Disconnect from the database
+    console.log("Database seeded successfully!");
+
     mongoose.disconnect();
   } catch (error) {
-    console.error("Error adding new categories and products:", error);
+    console.error("Error seeding database:", error);
     mongoose.disconnect();
   }
 }
 
-// Call the function to add new categories and products for the specified user
-addNewCategoriesAndProductsForUser("john@example.com");
+seedDatabase();

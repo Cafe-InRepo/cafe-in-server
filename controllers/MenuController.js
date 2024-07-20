@@ -23,7 +23,7 @@ const createMenu = (req, res) => {
 
 // Get the menu for the authenticated user
 const getMenu = (req, res) => {
-  Menu.findOne({ user: "668c61cde9b9312b5189b0b1" })
+  Menu.findOne({ user: "669ae52606c579379345b7cf" })
     .populate({
       path: "categories",
       populate: {
