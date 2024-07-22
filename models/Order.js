@@ -37,6 +37,10 @@ const orderSchema = new Schema({
     type: Date,
     default: Date.now,
   },
+  rated: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const Order = mongoose.model("Order", orderSchema);

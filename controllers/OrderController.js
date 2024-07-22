@@ -36,10 +36,10 @@ const calculateTotalPriceCreating = async (products) => {
 
 const createOrder = async (req, res) => {
   try {
-    const { products, table } = req.body;
-
-    if (!products || !table) {
-      return res.status(400).json({ error: "Products and table are required" });
+    const { products } = req.body;
+    const table = req.tableId;
+    if (!products) {
+      return res.status(400).json({ error: "Products are required" });
     }
 
     const productIds = products.map((item) => item.product);
@@ -69,7 +69,7 @@ const createOrder = async (req, res) => {
 
 const getAllOrders = async (req, res) => {
   try {
-    const tableId = "669ae52606c579379345b7d2";
+    const tableId = req.tableId;
     const orders = await Order.find({ table: tableId })
       .populate("products.product")
       .sort({ timestamp: -1 });
@@ -104,18 +104,26 @@ const updateOrder = async (req, res) => {
     const { orderId } = req.params;
     const { products, table, status, payed } = req.body;
 
-    let totalPrice;
-    if (products) {
-      totalPrice = await calculateTotalPrice(products);
+    // Only check products array when it is provided in the request
+    if (products !== undefined && products.length === 0) {
+      const deletedOrder = await Order.findByIdAndDelete(orderId);
+      if (!deletedOrder) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      return res.status(200).json({ message: "Order deleted successfully" });
     }
 
     const updateData = {
-      products,
       table,
       status,
       payed,
-      totalPrice,
     };
+
+    if (products !== undefined) {
+      const totalPrice = await calculateTotalPrice(products);
+      updateData.products = products;
+      updateData.totalPrice = totalPrice;
+    }
 
     const order = await Order.findByIdAndUpdate(orderId, updateData, {
       new: true,
@@ -130,6 +138,7 @@ const updateOrder = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
 
 const deleteOrder = async (req, res) => {
   try {
@@ -204,6 +213,38 @@ const decreaseProductQuantity = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+const rateOrderProducts = async (req, res) => {
+  const { orderId } = req.params;
+  const { ratings } = req.body;
+
+  try {
+    const order = await Order.findById(orderId).populate("products.product");
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    const productsRated = order.products.filter(({ product }) =>
+      ratings.hasOwnProperty(product._id.toString())
+    );
+
+    for (let { product } of productsRated) {
+      product.rate =
+        (product.rate * product.raters + ratings[product._id]) /
+        (product.raters + 1);
+      product.raters += 1;
+      await product.save();
+    }
+
+    order.rated = true;
+    await order.save();
+
+    res.status(200).json({ message: "Ratings submitted successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 
 module.exports = {
   createOrder,
@@ -213,4 +254,5 @@ module.exports = {
   deleteOrder,
   increaseProductQuantity,
   decreaseProductQuantity,
+  rateOrderProducts,
 };

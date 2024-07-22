@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const { validationResult } = require("express-validator");
 const router = express.Router();
 const User = require("../models/User");
+const Table = require("../models/Table");
 const nodemailer = require("nodemailer");
 const cloudinary = require("cloudinary").v2;
 
@@ -381,6 +382,64 @@ const resetPassword = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+const loginTable = async (req, res) => {
+  const { email, password, tableNumber } = req.body;
+
+  try {
+    // Find the user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ msg: "Invalid credentials" });
+    }
+
+    // Compare the password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ msg: "Invalid credentials" });
+    }
+
+    // Check if the user is either a superClient or client
+    if (user.role !== "superClient" && user.role !== "client") {
+      return res.status(403).json({ msg: "User not authorized" });
+    }
+
+    // Find the table by number and ensure it belongs to the superClient
+    const table = await Table.findOne({
+      number: tableNumber,
+      superClient: user.role === "superClient" ? user._id : user.superClient,
+    });
+
+    if (!table) {
+      return res.status(400).json({ msg: "Table not found or not authorized" });
+    }
+
+    // Create and send JWT token
+    const payload = {
+      user: {
+        id: user.id,
+        role: user.role,
+      },
+      table: {
+        id: table._id,
+        number: table.number,
+        superClient: table.superClient,
+      },
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: "24h" },
+      (err, token) => {
+        if (err) throw err;
+        res.json({ token });
+      }
+    );
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+};
 
 module.exports = {
   register,
@@ -390,4 +449,5 @@ module.exports = {
   CodeVerification,
   resendCode,
   getUserById,
+  loginTable,
 };

@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const bcrypt = require("bcrypt");
+const jwt = require('jsonwebtoken');
 const User = require('./models/User');
 const Table = require('./models/Table');
 const Product = require('./models/Product');
@@ -21,16 +23,22 @@ async function seedDatabase() {
     await Menu.deleteMany({});
     await Order.deleteMany({});
 
-    // Create users
-    const users = await User.insertMany([
-      { fullName: "John Doe", email: "john@example.com", password: "password", verificationCode: "12345", role: "client" },
-      { fullName: "Jane Smith", email: "jane@example.com", password: "password", verificationCode: "54321", role: "client" },
+    // Create users with hashed passwords
+    const hashedPassword = await bcrypt.hash("password", 10);
+    const superClients = await User.insertMany([
+      { fullName: "Restaurant Owner 1", email: "owner1@example.com", password: hashedPassword, verificationCode: "12345", role: "superClient" },
+      { fullName: "Restaurant Owner 2", email: "owner2@example.com", password: hashedPassword, verificationCode: "54321", role: "superClient" },
+    ]);
+
+    const clients = await User.insertMany([
+      { fullName: "Waiter 1", email: "waiter1@example.com", password: hashedPassword, verificationCode: "11111", role: "client", superClient: superClients[0]._id },
+      { fullName: "Waiter 2", email: "waiter2@example.com", password: hashedPassword, verificationCode: "22222", role: "client", superClient: superClients[1]._id },
     ]);
 
     // Create tables
     const tables = await Table.insertMany([
-      { number: 1, user: users[0]._id },
-      { number: 2, user: users[1]._id },
+      { number: 1, user: clients[0]._id, superClient: superClients[0]._id },
+      { number: 2, user: clients[1]._id, superClient: superClients[1]._id },
     ]);
 
     // Create products
@@ -81,8 +89,8 @@ async function seedDatabase() {
 
     // Create menus
     const menus = await Menu.insertMany([
-      { categories: [categories[0]._id, categories[1]._id], user: users[0]._id },
-      { categories: [categories[0]._id, categories[1]._id], user: users[1]._id },
+      { categories: [categories[0]._id, categories[1]._id], user: superClients[0]._id },
+      { categories: [categories[0]._id, categories[1]._id], user: superClients[1]._id },
     ]);
 
     // Create orders

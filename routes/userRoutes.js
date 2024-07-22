@@ -7,6 +7,7 @@ const {
   CodeVerification,
   resendCode,
   getUserById,
+  loginTable,
 } = require("../controllers/UserController");
 const verifyToken = require("../middleWares/jerifyToken");
 const router = express.Router();
@@ -19,5 +20,6 @@ router.post("/uploadProfileImage", verifyToken, uploadProfileImage);
 router.put("/changepwd", verifyToken, changePassword);
 router.post("/verifyUser", CodeVerification);
 router.post("/resendcode", resendCode);
+router.post("/login-table", loginTable);
 
 module.exports = router;

@@ -13,6 +13,11 @@ const userSchema = new Schema({
     enum: ['client', 'superClient'],
     required: true,
     default: 'client'
+  },
+  superClient: { // Only for client users to link them to a superClient
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: function() { return this.role === 'client'; }
   }
 });
 

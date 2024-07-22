@@ -23,17 +23,19 @@ const createMenu = (req, res) => {
 
 // Get the menu for the authenticated user
 const getMenu = (req, res) => {
-  Menu.findOne({ user: "669ae52606c579379345b7cf" })
+  const superClientId = req.superClientId;
+
+  Menu.findOne({ user: superClientId })
     .populate({
-      path: "categories",
+      path: 'categories',
       populate: {
-        path: "products",
-        model: "Product",
+        path: 'products',
+        model: 'Product',
       },
     })
     .then((menu) => {
       if (!menu) {
-        return res.status(404).json({ error: "Menu not found" });
+        return res.status(404).json({ error: 'Menu not found' });
       }
       res.json(menu);
     })
