@@ -1,9 +1,12 @@
 const jwt = require("jsonwebtoken");
+const logger = require("../logger"); // Import the logger
 
 const decodeTableToken = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
-  console.log(token);
+  logger.info("Token received:", token); // Log the received token
+
   if (!token) {
+    logger.warn("No token provided");
     return res.status(401).json({ error: "No token provided" });
   }
 
@@ -11,9 +14,10 @@ const decodeTableToken = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY); // Use your JWT secret key
     req.superClientId = decoded.table.superClient; // Assuming the token contains the superClientId
     req.tableId = decoded.table.id;
-    console.log(decoded.table.superClient);
+    logger.info("Token decoded successfully:", decoded.table.superClient); // Log successful decoding
     next();
   } catch (error) {
+    logger.error("Invalid token:", error); // Log the error
     return res.status(401).json({ error: "Invalid token" });
   }
 };

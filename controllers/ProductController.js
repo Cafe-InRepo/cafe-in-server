@@ -1,5 +1,6 @@
 const Product = require("../models/Product");
 const cloudinary = require("cloudinary").v2; // Ensure cloudinary is properly configured in your project
+const logger = require("../logger"); // Import the logger
 
 const createProduct = async (req, res) => {
   try {
@@ -7,6 +8,7 @@ const createProduct = async (req, res) => {
 
     // Validate required fields
     if (!name || !description || !price) {
+      logger.warn("Name, description, and price are required");
       return res.status(400).json({ error: "Name, description, and price are required" });
     }
 
@@ -14,6 +16,7 @@ const createProduct = async (req, res) => {
     const existingProduct = await Product.findOne({ name });
 
     if (existingProduct) {
+      logger.warn(`Product with name ${name} already exists`);
       return res.status(400).json({ error: "Product with this name already exists" });
     }
 
@@ -25,6 +28,7 @@ const createProduct = async (req, res) => {
         allowed_formats: ["jpg", "jpeg", "png"], // Allow only specific image formats
       });
       imageUrl = uploadedImage.secure_url;
+      logger.info(`Image uploaded to Cloudinary for product ${name}`);
     }
 
     // Create a new Product instance
@@ -41,9 +45,10 @@ const createProduct = async (req, res) => {
     // Save the new product to the database
     await newProduct.save();
 
+    logger.info(`Product ${name} created successfully`);
     res.status(201).json({ message: "Product created successfully", product: newProduct });
   } catch (error) {
-    console.error(error);
+    logger.error("Error creating product:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -53,12 +58,14 @@ const getAllProducts = async (req, res) => {
     const products = await Product.find().sort({ createdAt: -1 }); // Sort by creation date in descending order
 
     if (!products || products.length === 0) {
+      logger.warn("No products found");
       return res.status(404).json({ error: "No products found" });
     }
 
+    logger.info("Fetched all products");
     res.status(200).json(products);
   } catch (error) {
-    console.error(error);
+    logger.error("Error fetching all products:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -68,11 +75,13 @@ const getProduct = async (req, res) => {
     const { id } = req.params;
     const product = await Product.findById(id);
     if (!product) {
+      logger.warn(`Product with ID ${id} not found`);
       return res.status(404).json({ error: "Product not found" });
     }
+    logger.info(`Fetched product with ID ${id}`);
     res.status(200).json(product);
   } catch (error) {
-    console.error(error);
+    logger.error(`Error fetching product with ID ${id}:`, error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -83,6 +92,7 @@ const deleteProduct = async (req, res) => {
     // Find the product by ID
     const product = await Product.findById(productId);
     if (!product) {
+      logger.warn(`Product with ID ${productId} not found`);
       return res.status(404).json({ error: "Product not found" });
     }
 
@@ -95,9 +105,10 @@ const deleteProduct = async (req, res) => {
     // Delete the image from Cloudinary
     await cloudinary.uploader.destroy(`product_images/${publicId}`);
 
+    logger.info(`Product with ID ${productId} deleted successfully`);
     res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
-    console.error(error);
+    logger.error(`Error deleting product with ID ${productId}:`, error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -125,17 +136,20 @@ const updateProduct = async (req, res) => {
         invalidate: true, // Invalidate the old image in the CDN cache
       });
       updateData.img = uploadedImage.secure_url; // Save the new image URL
+      logger.info(`Image updated in Cloudinary for product ${name}`);
     }
 
     const product = await Product.findByIdAndUpdate(productId, updateData, {
       new: true,
     });
     if (!product) {
+      logger.warn(`Product with ID ${productId} not found`);
       return res.status(404).json({ error: "Product not found" });
     }
+    logger.info(`Product with ID ${productId} updated successfully`);
     res.status(200).json({ message: "Product updated successfully", product });
   } catch (error) {
-    console.error(error);
+    logger.error(`Error updating product with ID ${productId}:`, error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
