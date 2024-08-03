@@ -5,6 +5,8 @@ const productRoutes = require("./routes/productRoutes");
 const helmet = require("helmet");
 const menuRoutes = require("./routes/menuRoutes");
 const userRoutes = require("./routes/userRoutes");
+const tablesRoutes = require("./routes/tableRoutes");
+
 const orderRoutes = require("./routes/orderRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const logger = require("./logger"); // Import the logger
@@ -68,6 +70,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use("/auth", userRoutes);
+app.use("/tables", tablesRoutes);
 app.use("/products", productRoutes);
 app.use("/order", orderRoutes);
 app.use("/menu", menuRoutes);

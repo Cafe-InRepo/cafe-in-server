@@ -29,7 +29,9 @@ const register = async (req, res) => {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       logger.warn(`Client with email ${email} already exists`);
-      return res.status(400).json({ error: "Client with this email already exists" });
+      return res
+        .status(400)
+        .json({ error: "Client with this email already exists" });
     }
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(pwd, saltRounds);
@@ -46,7 +48,9 @@ const register = async (req, res) => {
 
     await user.save();
     logger.info(`Client registered successfully with email ${email}`);
-    res.status(201).json({ message: "Client registered successfully", userId: user._id });
+    res
+      .status(201)
+      .json({ message: "Client registered successfully", userId: user._id });
 
     sendVerifEmail(email, verificationCode, res, name);
   } catch (error) {
@@ -74,7 +78,9 @@ const sendVerifEmail = (email, verificationCode, res, name) => {
   transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
       logger.error("Failed to send verification email:", error);
-      return res.status(500).json({ error: "Failed to send verification email" });
+      return res
+        .status(500)
+        .json({ error: "Failed to send verification email" });
     } else {
       logger.info("Verification email sent: " + info.response);
       res.status(201).json({
@@ -114,12 +120,16 @@ const resendCode = async (req, res) => {
 
     if (!userId) {
       logger.warn("User ID is required to resend verification code");
-      return res.status(400).json({ error: "Error occurred, please try again later" });
+      return res
+        .status(400)
+        .json({ error: "Error occurred, please try again later" });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      logger.warn(`User with ID ${userId} not found for resending verification code`);
+      logger.warn(
+        `User with ID ${userId} not found for resending verification code`
+      );
       return res.status(404).json({ error: "Client not found" });
     }
     user.verificationCode = newVerificationCode;
@@ -135,7 +145,8 @@ const resendCode = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const { email, pwd } = req.body;
+    const { email, password } = req.body;
+    const pwd = password;
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -157,7 +168,9 @@ const login = async (req, res) => {
 
     if (!user.verified) {
       logger.warn(`Unverified user ${email} attempting to log in`);
-      return res.status(403).json({ error: "Please verify your account", userId: user._id });
+      return res
+        .status(403)
+        .json({ error: "Please verify your account", userId: user._id });
     }
 
     const token = jwt.sign(
@@ -281,7 +294,9 @@ const forgotPassword = async (req, res) => {
     transporter.sendMail(mailOptions, (error, info) => {
       if (error) {
         logger.error("Failed to send password reset email:", error);
-        return res.status(500).json({ error: "Failed to send password reset email" });
+        return res
+          .status(500)
+          .json({ error: "Failed to send password reset email" });
       } else {
         logger.info("Password reset email sent: " + info.response);
         res.status(200).json({ message: "Password reset email sent" });
@@ -306,7 +321,9 @@ const resetPassword = async (req, res) => {
 
     if (!user) {
       logger.warn(`Invalid or expired password reset code`);
-      return res.status(400).json({ error: "Password reset token is invalid or has expired" });
+      return res
+        .status(400)
+        .json({ error: "Password reset token is invalid or has expired" });
     }
 
     const saltRounds = 10;
@@ -373,13 +390,167 @@ const loginTable = async (req, res) => {
       { expiresIn: "24h" },
       (err, token) => {
         if (err) throw err;
-        logger.info(`User ${email} logged in successfully to table ${tableNumber}`);
+        logger.info(
+          `User ${email} logged in successfully to table ${tableNumber}`
+        );
         res.json({ token });
       }
     );
   } catch (err) {
     logger.error("Server error in loginTable:", err);
     res.status(500).send("Server error");
+  }
+};
+const getClientsBySuperClientId = async (req, res) => {
+  try {
+    const superClientId = req.superClientId; // Retrieved from the middleware
+
+    if (!superClientId) {
+      logger.warn("SuperClient ID is required to fetch clients");
+      return res.status(400).json({ error: "SuperClient ID is required" });
+    }
+
+    const clients = await User.find({
+      role: "client",
+      superClient: superClientId,
+    });
+
+    if (!clients.length) {
+      logger.warn(`No clients found for SuperClient ID ${superClientId}`);
+      return res.status(404).json({ message: "No clients found" });
+    }
+
+    logger.info(`Fetched clients for SuperClient ID ${superClientId}`);
+    res.status(200).json(clients);
+  } catch (error) {
+    logger.error("Error fetching clients:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+const createUser = async (req, res) => {
+  const { fullName, email, password } = req.body;
+
+  // Validate request
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  // Check if user with the same email already exists
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    logger.warn(`User with email ${email} already exists`);
+    return res
+      .status(400)
+      .json({ error: "User with this email already exists" });
+  }
+
+  try {
+    // Hash password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create user object
+    const newUser = new User({
+      fullName,
+      email,
+      password: hashedPassword,
+      superClient: req.superClientId, // Link the client to the superClient
+    });
+
+    // Save user to the database
+    await newUser.save();
+
+    logger.info(
+      `User ${email} created successfully by superClient ${req.superClientId}`
+    );
+    res
+      .status(201)
+      .json({ message: "User created successfully", userId: newUser._id });
+  } catch (error) {
+    logger.error("Error creating user:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+const deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const user = await User.findByIdAndDelete(userId);
+    if (!user) {
+      logger.warn(`User with ID ${userId} not found for deletion`);
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    logger.info(`User with ID ${userId} deleted successfully`);
+    res.status(200).json({ message: "User deleted successfully" });
+  } catch (error) {
+    logger.error("Error deleting user:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+const changeUserVerificationStatus = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { verified } = req.body;
+
+    if (typeof verified !== "boolean") {
+      return res
+        .status(400)
+        .json({ message: "Invalid 'verified' value. Must be a boolean." });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { verified },
+      { new: true }
+    );
+
+    if (!user) {
+      logger.warn(
+        `User with ID ${userId} not found for verification status update`
+      );
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    logger.info(
+      `User with ID ${userId} verification status updated successfully`
+    );
+    res
+      .status(200)
+      .json({ message: "User verification status updated successfully", user });
+  } catch (error) {
+    logger.error("Error updating user verification status:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const updateUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { fullName, email, password } = req.body;
+
+    const updateData = { fullName, email, role };
+    if (password) {
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+      updateData.password = hashedPassword;
+    }
+
+    const user = await User.findByIdAndUpdate(userId, updateData, {
+      new: true,
+    });
+    if (!user) {
+      logger.warn(`User with ID ${userId} not found for update`);
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    logger.info(`User with ID ${userId} updated successfully`);
+    res.status(200).json({ message: "User updated successfully", user });
+  } catch (error) {
+    logger.error("Error updating user:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -394,4 +565,9 @@ module.exports = {
   loginTable,
   forgotPassword,
   resetPassword,
+  getClientsBySuperClientId,
+  createUser,
+  updateUser,
+  deleteUser,
+  changeUserVerificationStatus,
 };

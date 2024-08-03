@@ -1,3 +1,4 @@
+const Order = require("../models/Order");
 const Table = require("../models/Table");
 
 // Create a new table
@@ -46,9 +47,35 @@ const deleteTable = (req, res) => {
     .catch((error) => res.status(500).json({ error: error.message }));
 };
 
+const getTablesWithUnpaiedOrders = async (req, res) => {
+  try {
+    const tables = await Table.find({
+      superClient: req.superClientId,
+    }).populate({
+      path: "orders",
+      match: { payed: false }, // Only populate unpaid orders
+    });
+
+    const tablesWithUnpaidOrders = tables.map((table) => ({
+      ...table.toObject(),
+      unpaidOrders: table.orders.length > 0,
+    }));
+
+    res.status(200).json(tablesWithUnpaidOrders);
+  } catch (err) {
+    res
+      .status(500)
+      .json({
+        message: "Error fetching tables with unpaid orders",
+        error: err.message,
+      });
+  }
+};
+
 module.exports = {
   createTable,
   getTables,
   updateTable,
   deleteTable,
+  getTablesWithUnpaiedOrders,
 };

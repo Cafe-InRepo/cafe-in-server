@@ -8,8 +8,14 @@ const {
   resendCode,
   getUserById,
   loginTable,
+  getClientsBySuperClientId,
+  createUser,
+  deleteUser,
+  updateUser,
+  changeUserVerificationStatus,
 } = require("../controllers/UserController");
 const verifyToken = require("../middleWares/jerifyToken");
+const verifySuperClient = require("../middleWares/VerifySuperClient");
 const router = express.Router();
 
 // Define routes for User model
@@ -21,5 +27,16 @@ router.put("/changepwd", verifyToken, changePassword);
 router.post("/verifyUser", CodeVerification);
 router.post("/resendcode", resendCode);
 router.post("/login-table", loginTable);
+
+//routes for superClient
+router.get(
+  "/superClient/getUsers",
+  verifySuperClient,
+  getClientsBySuperClientId
+);
+router.post("/superClient/create-user", verifySuperClient, createUser);
+router.delete("/superClient/:id", verifySuperClient, deleteUser);
+router.put("/superClient/:id", verifySuperClient, updateUser);
+router.patch("/superClient/:id/verify", changeUserVerificationStatus);
 
 module.exports = router;
