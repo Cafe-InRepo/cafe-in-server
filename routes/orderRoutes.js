@@ -22,7 +22,7 @@ router.delete("/:orderId", deleteOrder);
 
 router.get("/:orderId", getOrder);
 router.get("/", decodeTableToken, getAllOrders);
-router.put("/:orderId/increase/:productId", increaseProductQuantity);
-router.put("/:orderId/decrease/:productId", decreaseProductQuantity);
+// router.put("/:orderId/increase/:productId", increaseProductQuantity);
+// router.put("/:orderId/decrease/:productId", decreaseProductQuantity);
 
 module.exports = router;

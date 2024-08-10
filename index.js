@@ -6,6 +6,7 @@ const helmet = require("helmet");
 const menuRoutes = require("./routes/menuRoutes");
 const userRoutes = require("./routes/userRoutes");
 const tablesRoutes = require("./routes/tableRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
 
 const orderRoutes = require("./routes/orderRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
@@ -71,6 +72,7 @@ app.use((req, res, next) => {
 // Routes
 app.use("/auth", userRoutes);
 app.use("/tables", tablesRoutes);
+app.use("/categories", categoryRoutes);
 app.use("/products", productRoutes);
 app.use("/order", orderRoutes);
 app.use("/menu", menuRoutes);

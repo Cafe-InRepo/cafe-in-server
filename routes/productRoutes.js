@@ -2,17 +2,15 @@ const express = require("express");
 
 const {
   createProduct,
-  getAllProducts,
   deleteProduct,
   updateProduct,
 } = require("../controllers/ProductController");
-const verifyToken = require("../middleWares/jerifyToken");
+const verifySuperClient = require("../middleWares/VerifySuperClient");
 const router = express.Router();
 
 // Define routes for User model
-router.post("/", createProduct); // Create a new user
-router.get("/", verifyToken, getAllProducts);
-router.put("/:productId", verifyToken, updateProduct);
-router.delete("/delete/:productId", verifyToken, deleteProduct);
+router.post("/", verifySuperClient, createProduct); // Create a new user
+router.put("/:productId", verifySuperClient, updateProduct);
+router.delete("/:productId", verifySuperClient, deleteProduct);
 
 module.exports = router;

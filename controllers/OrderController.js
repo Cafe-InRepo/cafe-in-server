@@ -34,7 +34,7 @@ const calculateTotalPriceCreating = async (products) => {
 const createOrder = async (req, res) => {
   try {
     const { products } = req.body;
-    const tableId = "669d1bebf3c2d49e40d2957a";
+    const tableId = req.tableId;
     if (!products) {
       logger.warn("Products are required to create an order");
       return res.status(400).json({ error: "Products are required" });
@@ -83,7 +83,7 @@ const createOrder = async (req, res) => {
 
 const getAllOrders = async (req, res) => {
   try {
-    const tableId = "669d1bebf3c2d49e40d2957a";
+    const tableId = req.tableId;
     const orders = await Order.find({ table: tableId })
       .populate("products.product")
       .sort({ timestamp: -1 });
@@ -206,88 +206,88 @@ const deleteOrder = async (req, res) => {
   }
 };
 
-const increaseProductQuantity = async (req, res) => {
-  try {
-    const orderId = req.params.orderId;
-    const productId = req.params.productId;
+// const increaseProductQuantity = async (req, res) => {
+//   try {
+//     const orderId = req.params.orderId;
+//     const productId = req.params.productId;
 
-    const order = await Order.findById(orderId).populate("products.product");
-    if (!order) {
-      logger.warn(
-        `Order with ID ${orderId} not found when attempting to increase product quantity`
-      );
-      return res.status(404).json({ error: "Order not found" });
-    }
+//     const order = await Order.findById(orderId).populate("products.product");
+//     if (!order) {
+//       logger.warn(
+//         `Order with ID ${orderId} not found when attempting to increase product quantity`
+//       );
+//       return res.status(404).json({ error: "Order not found" });
+//     }
 
-    const productIndex = order.products.findIndex((p) =>
-      p.product._id.equals(productId)
-    );
-    if (productIndex === -1) {
-      logger.warn(`Product with ID ${productId} not found in order ${orderId}`);
-      return res.status(404).json({ error: "Product not found in the order" });
-    }
+//     const productIndex = order.products.findIndex((p) =>
+//       p.product._id.equals(productId)
+//     );
+//     if (productIndex === -1) {
+//       logger.warn(`Product with ID ${productId} not found in order ${orderId}`);
+//       return res.status(404).json({ error: "Product not found in the order" });
+//     }
 
-    order.products[productIndex].quantity += 1;
-    order.totalPrice = await calculateTotalPrice(order.products);
-    await order.save();
-    logger.info(
-      `Product quantity increased for product ${productId} in order ${orderId}`
-    );
+//     order.products[productIndex].quantity += 1;
+//     order.totalPrice = await calculateTotalPrice(order.products);
+//     await order.save();
+//     logger.info(
+//       `Product quantity increased for product ${productId} in order ${orderId}`
+//     );
 
-    res.status(200).json({ message: "Product quantity increased", order });
-  } catch (error) {
-    logger.error(
-      `Error increasing product quantity for product ${req.params.productId} in order ${req.params.orderId}: ${error.message}`,
-      error
-    );
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
+//     res.status(200).json({ message: "Product quantity increased", order });
+//   } catch (error) {
+//     logger.error(
+//       `Error increasing product quantity for product ${req.params.productId} in order ${req.params.orderId}: ${error.message}`,
+//       error
+//     );
+//     res.status(500).json({ error: "Internal server error" });
+//   }
+// };
 
-const decreaseProductQuantity = async (req, res) => {
-  try {
-    const orderId = req.params.orderId;
-    const productId = req.params.productId;
+// const decreaseProductQuantity = async (req, res) => {
+//   try {
+//     const orderId = req.params.orderId;
+//     const productId = req.params.productId;
 
-    const order = await Order.findById(orderId).populate("products.product");
-    if (!order) {
-      logger.warn(
-        `Order with ID ${orderId} not found when attempting to decrease product quantity`
-      );
-      return res.status(404).json({ error: "Order not found" });
-    }
+//     const order = await Order.findById(orderId).populate("products.product");
+//     if (!order) {
+//       logger.warn(
+//         `Order with ID ${orderId} not found when attempting to decrease product quantity`
+//       );
+//       return res.status(404).json({ error: "Order not found" });
+//     }
 
-    const productIndex = order.products.findIndex((p) =>
-      p.product._id.equals(productId)
-    );
-    if (productIndex === -1) {
-      logger.warn(`Product with ID ${productId} not found in order ${orderId}`);
-      return res.status(404).json({ error: "Product not found in the order" });
-    }
+//     const productIndex = order.products.findIndex((p) =>
+//       p.product._id.equals(productId)
+//     );
+//     if (productIndex === -1) {
+//       logger.warn(`Product with ID ${productId} not found in order ${orderId}`);
+//       return res.status(404).json({ error: "Product not found in the order" });
+//     }
 
-    if (order.products[productIndex].quantity > 1) {
-      order.products[productIndex].quantity -= 1;
-      order.totalPrice = await calculateTotalPrice(order.products);
-      await order.save();
-      logger.info(
-        `Product quantity decreased for product ${productId} in order ${orderId}`
-      );
+//     if (order.products[productIndex].quantity > 1) {
+//       order.products[productIndex].quantity -= 1;
+//       order.totalPrice = await calculateTotalPrice(order.products);
+//       await order.save();
+//       logger.info(
+//         `Product quantity decreased for product ${productId} in order ${orderId}`
+//       );
 
-      res.status(200).json({ message: "Product quantity decreased", order });
-    } else {
-      logger.warn(
-        `Attempt to decrease quantity below 1 for product ${productId} in order ${orderId}`
-      );
-      res.status(400).json({ error: "Product quantity cannot be less than 1" });
-    }
-  } catch (error) {
-    logger.error(
-      `Error decreasing product quantity for product ${req.params.productId} in order ${req.params.orderId}: ${error.message}`,
-      error
-    );
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
+//       res.status(200).json({ message: "Product quantity decreased", order });
+//     } else {
+//       logger.warn(
+//         `Attempt to decrease quantity below 1 for product ${productId} in order ${orderId}`
+//       );
+//       res.status(400).json({ error: "Product quantity cannot be less than 1" });
+//     }
+//   } catch (error) {
+//     logger.error(
+//       `Error decreasing product quantity for product ${req.params.productId} in order ${req.params.orderId}: ${error.message}`,
+//       error
+//     );
+//     res.status(500).json({ error: "Internal server error" });
+//   }
+// };
 
 const rateOrderProducts = async (req, res) => {
   try {
@@ -334,7 +334,5 @@ module.exports = {
   getOrder,
   updateOrder,
   deleteOrder,
-  increaseProductQuantity,
-  decreaseProductQuantity,
   rateOrderProducts,
 };

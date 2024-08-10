@@ -1,24 +1,25 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
 const verifyToken = (req, res, next) => {
-  const authHeader = req.header('Authorization');
+  const authHeader = req.header("Authorization");
   if (!authHeader) {
-    return res.status(401).json({ error: 'Unauthorized - No token provided' });
+    return res.status(401).json({ error: "Unauthorized - No token provided" });
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = authHeader.split(" ")[1];
   if (!token) {
-    return res.status(401).json({ error: 'Unauthorized - No token provided' });
+    return res.status(401).json({ error: "Unauthorized - No token provided" });
   }
 
   try {
-    const decoded = jwt.verify(token, 'RyyTwyqhIytpayn9cYA1KpXbD2GV1h2q');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
     req.userId = decoded.userId;
+    req.superClientId = decoded.table.superClient;
     req.role = decoded.role; // Add role to the request object
     next();
   } catch (error) {
     console.error(error);
-    res.status(401).json({ error: 'Unauthorized - Invalid token' });
+    res.status(401).json({ error: "Unauthorized - Invalid token" });
   }
 };
 

@@ -23,6 +23,7 @@ const createMenu = (req, res) => {
 
 // Get the menu for the authenticated user
 const getMenu = (req, res) => {
+  //each superClient has only one menu
   const superClientId = req.superClientId;
 
   Menu.findOne({ user: superClientId })
