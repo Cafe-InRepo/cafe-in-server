@@ -2,6 +2,7 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Table = require("../models/Table");
 const logger = require("../logger");
+const { default: mongoose } = require("mongoose");
 
 const calculateTotalPrice = async (products) => {
   const productIds = products.map((item) => item.product);
@@ -327,6 +328,99 @@ const rateOrderProducts = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+// Confirm payment for selected orders
+const confirmSelectedPayments = async (req, res) => {
+  const { orderIds } = req.body;
+  console.log("Received order IDs:", orderIds);
+
+  try {
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      return res.status(400).json({ message: "No valid order IDs provided" });
+    }
+
+    // Validate that each orderId is a valid ObjectId
+    const validOrderIds = orderIds.filter((id) =>
+      mongoose.Types.ObjectId.isValid(id)
+    );
+
+    if (validOrderIds.length === 0) {
+      return res.status(400).json({ message: "No valid order IDs found" });
+    }
+
+    // Update the orders to mark them as paid
+    const updatedOrders = await Order.updateMany(
+      { _id: { $in: validOrderIds }, payed: false },
+      { $set: { payed: true } }
+    );
+
+    console.log("Update Result:", updatedOrders); // Log the update result
+
+    if (updatedOrders.nModified === 0) {
+      return res.status(404).json({
+        message:
+          "No orders were updated. Orders may already be paid or invalid.",
+      });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Selected orders confirmed as paid", updatedOrders });
+  } catch (error) {
+    console.error("Error confirming selected payments:", error);
+    res.status(500).json({
+      message: "Error confirming selected payments",
+      error: error.message,
+    });
+  }
+};
+
+// Confirm payment for all unpaid orders associated with a table
+const confirmAllPayments = async (req, res) => {
+  const { tableId } = req.params;
+
+  try {
+    // Find the table with its unpaid orders
+    const table = await Table.findById(tableId).populate({
+      path: "orders",
+      match: { paid: false },
+    });
+
+    if (!table) {
+      return res.status(404).json({ message: "Table not found" });
+    }
+
+    // Get the IDs of the unpaid orders
+    const unpaidOrderIds = table.orders.map((order) => order._id);
+
+    if (unpaidOrderIds.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "No unpaid orders found for this table" });
+    }
+
+    // Update all unpaid orders to mark them as paid
+    const updatedOrders = await Order.updateMany(
+      { _id: { $in: unpaidOrderIds } },
+      { $set: { paid: true } }
+    );
+
+    if (!updatedOrders.nModified) {
+      return res.status(404).json({
+        message:
+          "No orders were updated. Orders may already be paid or invalid.",
+      });
+    }
+
+    res
+      .status(200)
+      .json({ message: "All unpaid orders confirmed as paid", updatedOrders });
+  } catch (error) {
+    console.error("Error confirming all payments:", error);
+    res
+      .status(500)
+      .json({ message: "Error confirming all payments", error: error.message });
+  }
+};
 
 module.exports = {
   createOrder,
@@ -335,4 +429,6 @@ module.exports = {
   updateOrder,
   deleteOrder,
   rateOrderProducts,
+  confirmSelectedPayments,
+  confirmAllPayments,
 };

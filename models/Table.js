@@ -9,7 +9,7 @@ const tableSchema = new Schema({
   user: {
     type: Schema.Types.ObjectId,
     ref: "User",
-    required: true,
+    required: false,
   },
   superClient: {
     type: Schema.Types.ObjectId,

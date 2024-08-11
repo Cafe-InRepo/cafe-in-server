@@ -5,12 +5,11 @@ const {
   getOrder,
   getAllOrders,
   updateOrder,
-  increaseProductQuantity,
-  decreaseProductQuantity,
   rateOrderProducts,
   deleteOrder,
+  confirmSelectedPayments,
+  confirmAllPayments,
 } = require("../controllers/OrderController");
-const verifyToken = require("../middleWares/jerifyToken");
 const decodeTableToken = require("../middleWares/decodeTableToken");
 const router = express.Router();
 
@@ -24,5 +23,7 @@ router.get("/:orderId", getOrder);
 router.get("/", decodeTableToken, getAllOrders);
 // router.put("/:orderId/increase/:productId", increaseProductQuantity);
 // router.put("/:orderId/decrease/:productId", decreaseProductQuantity);
+router.put("/confirm/confirm-payment", confirmSelectedPayments);
+router.put("/tables/:tableId/confirm-all-payments", confirmAllPayments);
 
 module.exports = router;
