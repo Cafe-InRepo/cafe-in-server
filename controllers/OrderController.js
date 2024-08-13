@@ -421,6 +421,74 @@ const confirmAllPayments = async (req, res) => {
       .json({ message: "Error confirming all payments", error: error.message });
   }
 };
+const getOrdersBySuperClientIdFIFO = async (req, res) => {
+  const superClientId = req.superClientId;
+
+  try {
+    // Find tables that match the superClientId
+    const tables = await Table.find({ superClient: superClientId });
+    // Extract table IDs
+    const tableIds = tables.map((table) => table._id);
+
+    // Find orders that match the table IDs, sorted by timestamp (FIFO)
+    const orders = await Order.find({ table: { $in: tableIds } })
+      .sort({ timestamp: 1 })
+      .populate("table")
+      .populate("products.product");
+
+    // Return the filtered and sorted orders as a JSON response
+    res.status(200).json(orders);
+  } catch (error) {
+    // Handle any errors
+    res
+      .status(500)
+      .json({ message: "Failed to retrieve orders", error: error.message });
+  }
+};
+
+const updateOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+
+    // Validate the orderId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ error: "Invalid Order ID" });
+    }
+
+    // Find the order by ID
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Check the current status and only allow valid status changes
+    if (order.status === "completed") {
+      return res
+        .status(400)
+        .json({ error: "Cannot change status of a completed order" });
+    }
+
+    const validTransitions = {
+      pending: "preparing",
+      preparing: "completed",
+    };
+
+    if (status !== validTransitions[order.status]) {
+      return res.status(400).json({ error: "Invalid status transition" });
+    }
+
+    // Update the order status
+    order.status = status;
+    await order.save();
+    req.io.emit("orderUpdated", order);
+
+    res.json({ message: "Order status updated successfully", order });
+  } catch (error) {
+    console.error("Error updating order status:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   createOrder,
@@ -431,4 +499,6 @@ module.exports = {
   rateOrderProducts,
   confirmSelectedPayments,
   confirmAllPayments,
+  getOrdersBySuperClientIdFIFO,
+  updateOrderStatus,
 };
