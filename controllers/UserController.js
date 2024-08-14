@@ -361,6 +361,10 @@ const loginTable = async (req, res) => {
       logger.warn(`Unauthorized login attempt by user ${email}`);
       return res.status(403).json({ msg: "User not authorized" });
     }
+    if (user.verified !== true) {
+      logger.warn(`user ${email} is not active and trying to open a table`);
+      return res.status(403).json({ msg: "User not active" });
+    }
 
     const table = await Table.findOne({
       number: tableNumber,

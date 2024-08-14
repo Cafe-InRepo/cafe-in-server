@@ -24,5 +24,8 @@ const tableSchema = new Schema({
   ],
 });
 
+// Create a compound unique index
+tableSchema.index({ number: 1, superClient: 1 }, { unique: true });
+
 const Table = mongoose.model("Table", tableSchema);
 module.exports = Table;

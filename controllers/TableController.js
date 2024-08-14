@@ -99,7 +99,6 @@ const getTableById = async (req, res) => {
       return res.status(404).json({ error: "Table not found" });
     }
 
-
     // Populate orders and their associated products
     await Order.populate(table, {
       path: "orders.products.product", // Assuming each order has a products array with a product reference

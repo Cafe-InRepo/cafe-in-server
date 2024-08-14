@@ -71,7 +71,7 @@ const createOrder = async (req, res) => {
     logger.info(`Order created successfully for table ${table._id}`);
 
     // Emit order created event
-    req.io.emit("orderCreated", newOrder);
+    req.io.emit("newOrder", newOrder);
 
     res
       .status(201)
@@ -141,6 +141,8 @@ const updateOrder = async (req, res) => {
       });
 
       logger.info(`Order with ID ${orderId} deleted successfully`);
+      req.io.emit("newOrder", order);
+
       return res.status(200).json({ message: "Order deleted successfully" });
     }
 
@@ -161,11 +163,7 @@ const updateOrder = async (req, res) => {
       return res.status(404).json({ error: "Order not found" });
     }
     logger.info(`Order with ID ${orderId} updated successfully`);
-
-    // Emit order updated event if the status was updated
-    if (req.body.status !== undefined) {
-      req.io.emit("orderUpdated", order);
-    }
+    req.io.emit("newOrder", order);
 
     res.status(200).json({ message: "Order updated successfully", order });
   } catch (error) {
@@ -197,6 +195,7 @@ const deleteOrder = async (req, res) => {
     });
 
     logger.info(`Order with ID ${orderId} deleted successfully`);
+    req.io.emit("newOrder", order);
     res.status(200).json({ message: "Order deleted successfully" });
   } catch (error) {
     logger.error(
