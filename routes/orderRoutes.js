@@ -14,13 +14,20 @@ const {
 } = require("../controllers/OrderController");
 const decodeTableToken = require("../middleWares/decodeTableToken");
 const verifySuperClient = require("../middleWares/VerifySuperClient");
+const verifyClientOrSuperClient = require("../middleWares/verifyClientOrSuperClient");
 const router = express.Router();
 
 // Define routes for User model
 router.post("/", decodeTableToken, createOrder);
+router.post("/manual", verifyClientOrSuperClient, createOrder);
+
 router.post("/:orderId/rate", rateOrderProducts);
 router.put("/:orderId", updateOrder);
-router.put("/update-status/:orderId", verifySuperClient, updateOrderStatus);
+router.put(
+  "/update-status/:orderId",
+  verifyClientOrSuperClient,
+  updateOrderStatus
+);
 
 router.delete("/:orderId", deleteOrder);
 
@@ -29,7 +36,7 @@ router.get("/", decodeTableToken, getAllOrders);
 router.get("/client", getAllOrders);
 router.get(
   "/orders/ordersfifo",
-  verifySuperClient,
+  verifyClientOrSuperClient,
   getOrdersBySuperClientIdFIFO
 );
 

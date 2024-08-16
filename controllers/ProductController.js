@@ -1,5 +1,7 @@
 const Product = require("../models/Product");
 const Category = require("../models/Category");
+const Menu = require("../models/Menu");
+
 const logger = require("../logger");
 const cloudinary = require("cloudinary").v2; // Ensure cloudinary is properly configured in your project
 
@@ -116,8 +118,36 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+const getMenuProducts = async (req, res) => {
+  try {
+    const userId = req.superClientId;
+
+    // Find the menu for the given userId and populate categories and their products
+    const menu = await Menu.findOne({ user: userId }).populate({
+      path: "categories",
+      populate: {
+        path: "products",
+        model: "Product",
+      },
+    });
+
+    if (!menu) {
+      return res.status(404).json({ message: "Menu not found for this user" });
+    }
+
+    // Extract all products from the populated categories
+    const products = menu.categories.flatMap((category) => category.products);
+
+    return res.status(200).json(products);
+  } catch (err) {
+    console.error("Error fetching menu products:", err);
+    return res.status(500).json({ message: "Failed to fetch products" });
+  }
+};
+
 module.exports = {
   createProduct,
   updateProduct,
   deleteProduct,
+  getMenuProducts,
 };

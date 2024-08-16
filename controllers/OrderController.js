@@ -35,7 +35,7 @@ const calculateTotalPriceCreating = async (products) => {
 const createOrder = async (req, res) => {
   try {
     const { products } = req.body;
-    const tableId = req.tableId;
+    const tableId = req.tableId || req.body.tableId;
     if (!products) {
       logger.warn("Products are required to create an order");
       return res.status(400).json({ error: "Products are required" });
