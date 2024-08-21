@@ -31,6 +31,7 @@ const createProduct = async (req, res) => {
     category.products.push(newProduct._id);
     await category.save();
     await newProduct.save();
+    req.io.emit("productUpdated");
 
     logger.info(`Product ${name} created successfully`);
     res
@@ -77,7 +78,7 @@ const updateProduct = async (req, res) => {
     product.available = available;
 
     await product.save();
-
+    req.io.emit("productUpdated");
     logger.info(`Product with ID ${productId} updated successfully`);
     res.status(200).json({ message: "Product updated successfully", product });
   } catch (error) {
@@ -109,6 +110,7 @@ const deleteProduct = async (req, res) => {
 
     logger.info(`Product with ID ${productId} deleted successfully`);
     res.status(200).json({ message: "Product deleted successfully" });
+    req.io.emit("productUpdated");
   } catch (error) {
     logger.error(
       `Error deleting product with ID ${req.params.productId}:`,
@@ -144,10 +146,45 @@ const getMenuProducts = async (req, res) => {
     return res.status(500).json({ message: "Failed to fetch products" });
   }
 };
+const changeProductAvailability = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { available } = req.body;
+
+    // Find the product by ID
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    // Update the availability status
+    product.available = available;
+
+    // Save the updated product
+    await product.save();
+    req.io.emit("productUpdated");
+
+    // Log the change
+    logger.info(
+      `Product with ID ${productId} availability updated to ${available}`
+    );
+
+    res
+      .status(200)
+      .json({ message: "Product availability updated successfully", product });
+  } catch (error) {
+    logger.error(
+      `Error updating availability for product with ID ${req.params.productId}:`,
+      error
+    );
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   createProduct,
   updateProduct,
   deleteProduct,
   getMenuProducts,
+  changeProductAvailability,
 };

@@ -5,6 +5,7 @@ const {
   deleteProduct,
   updateProduct,
   getMenuProducts,
+  changeProductAvailability,
 } = require("../controllers/ProductController");
 const verifySuperClient = require("../middleWares/VerifySuperClient");
 const verifyClientOrSuperClient = require("../middleWares/verifyClientOrSuperClient");
@@ -14,6 +15,7 @@ const router = express.Router();
 router.post("/", verifySuperClient, createProduct); // Create a new user
 router.get("/", verifyClientOrSuperClient, getMenuProducts); // Create a new user
 router.put("/:productId", verifySuperClient, updateProduct);
+router.put("/:productId/availability",verifyClientOrSuperClient ,changeProductAvailability);
 router.delete("/:productId", verifySuperClient, deleteProduct);
 
 module.exports = router;
