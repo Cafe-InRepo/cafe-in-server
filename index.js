@@ -30,7 +30,7 @@ const io = socketIo(server, {
 
 // Enable CORS
 const cors = require("cors");
-app.use(cors());
+app.use(cors("*"));
 
 // Middleware
 app.use(bodyParser.json({ limit: "50mb" }));
