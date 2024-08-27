@@ -352,7 +352,7 @@ const confirmSelectedPayments = async (req, res) => {
       { $set: { payed: true } }
     );
 
-    console.log("Update Result:", updatedOrders); // Log the update result
+    logger.info("Update Result:", updatedOrders); // Log the update result
 
     if (updatedOrders.nModified === 0) {
       return res.status(404).json({
@@ -361,9 +361,31 @@ const confirmSelectedPayments = async (req, res) => {
       });
     }
 
-    res
-      .status(200)
-      .json({ message: "Selected orders confirmed as paid", updatedOrders });
+    // Check if all orders for each table are paid, and if so, archive them
+    const tablesToCheck = await Order.distinct("table", {
+      _id: { $in: validOrderIds },
+    });
+
+    const archiveUpdates = await Promise.all(
+      tablesToCheck.map(async (tableId) => {
+        const unpaidOrders = await Order.find({ table: tableId, payed: false });
+
+        if (unpaidOrders.length === 0) {
+          // Archive all orders for this table
+          return Order.updateMany(
+            { table: tableId },
+            { $set: { status: "archived" } }
+          );
+        }
+      })
+    );
+
+    res.status(200).json({
+      message:
+        "Selected orders confirmed as paid, and relevant orders archived",
+      updatedOrders,
+      archiveUpdates,
+    });
   } catch (error) {
     console.error("Error confirming selected payments:", error);
     res.status(500).json({
@@ -374,52 +396,52 @@ const confirmSelectedPayments = async (req, res) => {
 };
 
 // Confirm payment for all unpaid orders associated with a table
-const confirmAllPayments = async (req, res) => {
-  const { tableId } = req.params;
+// const confirmAllPayments = async (req, res) => {
+//   const { tableId } = req.params;
 
-  try {
-    // Find the table with its unpaid orders
-    const table = await Table.findById(tableId).populate({
-      path: "orders",
-      match: { paid: false },
-    });
+//   try {
+//     // Find the table with its unpaid orders
+//     const table = await Table.findById(tableId).populate({
+//       path: "orders",
+//       match: { paid: false },
+//     });
 
-    if (!table) {
-      return res.status(404).json({ message: "Table not found" });
-    }
+//     if (!table) {
+//       return res.status(404).json({ message: "Table not found" });
+//     }
 
-    // Get the IDs of the unpaid orders
-    const unpaidOrderIds = table.orders.map((order) => order._id);
+//     // Get the IDs of the unpaid orders
+//     const unpaidOrderIds = table.orders.map((order) => order._id);
 
-    if (unpaidOrderIds.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "No unpaid orders found for this table" });
-    }
+//     if (unpaidOrderIds.length === 0) {
+//       return res
+//         .status(400)
+//         .json({ message: "No unpaid orders found for this table" });
+//     }
 
-    // Update all unpaid orders to mark them as paid
-    const updatedOrders = await Order.updateMany(
-      { _id: { $in: unpaidOrderIds } },
-      { $set: { paid: true } }
-    );
+//     // Update all unpaid orders to mark them as paid
+//     const updatedOrders = await Order.updateMany(
+//       { _id: { $in: unpaidOrderIds } },
+//       { $set: { paid: true } }
+//     );
 
-    if (!updatedOrders.nModified) {
-      return res.status(404).json({
-        message:
-          "No orders were updated. Orders may already be paid or invalid.",
-      });
-    }
+//     if (!updatedOrders.nModified) {
+//       return res.status(404).json({
+//         message:
+//           "No orders were updated. Orders may already be paid or invalid.",
+//       });
+//     }
 
-    res
-      .status(200)
-      .json({ message: "All unpaid orders confirmed as paid", updatedOrders });
-  } catch (error) {
-    console.error("Error confirming all payments:", error);
-    res
-      .status(500)
-      .json({ message: "Error confirming all payments", error: error.message });
-  }
-};
+//     res
+//       .status(200)
+//       .json({ message: "All unpaid orders confirmed as paid", updatedOrders });
+//   } catch (error) {
+//     console.error("Error confirming all payments:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Error confirming all payments", error: error.message });
+//   }
+// };
 const getOrdersBySuperClientIdFIFO = async (req, res) => {
   const superClientId = req.superClientId;
 
@@ -429,16 +451,19 @@ const getOrdersBySuperClientIdFIFO = async (req, res) => {
     // Extract table IDs
     const tableIds = tables.map((table) => table._id);
 
-    // Find orders that match the table IDs, sorted by timestamp (FIFO)
-    const orders = await Order.find({ table: { $in: tableIds } })
-      .sort({ timestamp: 1 })
-      .populate("table")
-      .populate("products.product");
+    // Find orders that match the table IDs, sorted by timestamp (FIFO), excluding archived orders
+    const orders = await Order.find({
+      table: { $in: tableIds },
+      status: { $ne: "archived" }, // Exclude orders with status "archived"
+    })
+      .sort({ timestamp: 1 }) // Sort orders in FIFO order
+      .populate("table") // Populate the table details
+      .populate("products.product"); // Populate product details within each order
 
     // Return the filtered and sorted orders as a JSON response
     res.status(200).json(orders);
   } catch (error) {
-    // Handle any errors
+    // Handle any errors that occur during the process
     res
       .status(500)
       .json({ message: "Failed to retrieve orders", error: error.message });
@@ -497,7 +522,7 @@ module.exports = {
   deleteOrder,
   rateOrderProducts,
   confirmSelectedPayments,
-  confirmAllPayments,
+  //confirmAllPayments,
   getOrdersBySuperClientIdFIFO,
   updateOrderStatus,
 };

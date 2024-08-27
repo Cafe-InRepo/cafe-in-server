@@ -88,9 +88,14 @@ const getTableById = async (req, res) => {
     const superClient = req.superClientId;
 
     // Find the table by ID and ensure it belongs to the authenticated superClient
-    const table = await Table.findOne({ _id: id, superClient }).populate(
-      "orders"
-    );
+    const table = await Table.findOne({ _id: id, superClient }).populate({
+      path: "orders",
+      match: { status: { $ne: "archived" } }, // Exclude archived orders
+      populate: {
+        path: "products.product", // Populate the products in each order
+        model: "Product", // Ensure the model name is correct
+      },
+    });
 
     if (!table) {
       console.log(
@@ -98,12 +103,6 @@ const getTableById = async (req, res) => {
       );
       return res.status(404).json({ error: "Table not found" });
     }
-
-    // Populate orders and their associated products
-    await Order.populate(table, {
-      path: "orders.products.product", // Assuming each order has a products array with a product reference
-      model: "Product", // Ensure the model name is correct
-    });
 
     res.status(200).json(table);
   } catch (error) {

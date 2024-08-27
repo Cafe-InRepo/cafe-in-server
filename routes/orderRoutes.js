@@ -8,12 +8,11 @@ const {
   rateOrderProducts,
   deleteOrder,
   confirmSelectedPayments,
-  confirmAllPayments,
   getOrdersBySuperClientIdFIFO,
   updateOrderStatus,
 } = require("../controllers/OrderController");
 const decodeTableToken = require("../middleWares/decodeTableToken");
-const verifySuperClient = require("../middleWares/VerifySuperClient");
+//const verifySuperClient = require("../middleWares/VerifySuperClient");
 const verifyClientOrSuperClient = require("../middleWares/verifyClientOrSuperClient");
 const router = express.Router();
 
@@ -43,6 +42,5 @@ router.get(
 // router.put("/:orderId/increase/:productId", increaseProductQuantity);
 // router.put("/:orderId/decrease/:productId", decreaseProductQuantity);
 router.put("/confirm/confirm-payment", confirmSelectedPayments);
-router.put("/tables/:tableId/confirm-all-payments", confirmAllPayments);
 
 module.exports = router;
