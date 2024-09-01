@@ -85,7 +85,10 @@ const createOrder = async (req, res) => {
 const getAllOrders = async (req, res) => {
   try {
     const tableId = req.tableId;
-    const orders = await Order.find({ table: tableId })
+    const orders = await Order.find({
+      table: tableId,
+      status: { $ne: "archived" }, // Exclude orders with status 'archived'
+    })
       .populate("products.product")
       .sort({ timestamp: -1 });
 
