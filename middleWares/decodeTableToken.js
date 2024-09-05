@@ -14,6 +14,7 @@ const decodeTableToken = (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY); // Use your JWT secret key
     req.superClientId = decoded.table.superClient; // Assuming the token contains the superClientId
     req.tableId = decoded.table.id;
+    req.user = decoded.user.id;
     logger.info("Token decoded successfully:", decoded.table.superClient); // Log successful decoding
     next();
   } catch (error) {

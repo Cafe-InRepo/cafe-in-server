@@ -9,6 +9,8 @@ const {
   getRevenueForCurrentYear,
   getRevenueCSV,
   getRevenueByProductByMonth,
+  getRevenueByProductForCurrentWeek,
+  getRevenueExcel,
 } = require("../controllers/DashboardingController");
 const verifySuperClient = require("../middleWares/VerifySuperClient");
 
@@ -37,6 +39,11 @@ router.get(
 router.get("/most-sold-products", verifySuperClient, getMostSoldProducts);
 
 router.get("/revenue-year", verifySuperClient, getRevenueForCurrentYear);
-router.get("/revenue-csv", verifySuperClient, getRevenueCSV);
+router.get("/revenue-csv", verifySuperClient, getRevenueExcel);
+router.get(
+  "/revenue-by-product-by-day",
+  verifySuperClient,
+  getRevenueByProductForCurrentWeek
+);
 
 module.exports = router;

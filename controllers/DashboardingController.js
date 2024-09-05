@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const Order = require("../models/Order");
-const { Parser } = require("json2csv");
-
+const xlsx = require("xlsx");
 const getDailyRevenue = async (req, res) => {
   const superClientId = req.superClientId;
 
@@ -98,39 +97,77 @@ const getMonthlyRevenue = async (req, res) => {
 };
 
 const getRevenueByClient = async (req, res) => {
-  const superClientId = req.superClientId;
+  const superClientId = req.superClientId; // Assuming you get this from authentication
 
   try {
+    // Find orders with 'archived' status and populate 'table' and 'user' (for client details)
     const orders = await Order.find({
       status: "archived",
     })
-      .populate("table") // Populate the table
+      .populate({
+        path: "table", // Populate the 'table' field
+        populate: {
+          path: "superClient", // Populate the 'superClient' within the table
+          model: "User", // SuperClient refers to the 'User' model
+        },
+      })
+      .populate("user", "fullName") // Populate 'user' field and select 'fullName'
       .then((orders) => {
-        return orders.filter((order) =>
-          order.table.superClient.equals(superClientId)
+        // Filter orders by superClient, making sure it's populated
+        return orders.filter(
+          (order) =>
+            order.table.superClient &&
+            order.table.superClient._id.equals(superClientId)
         );
       });
 
+    // Calculate revenue by client
     const revenue = orders.reduce((result, order) => {
-      const clientId = order.table.user;
+      const clientId = order.user;
+      const clientName = order.user.fullName;
+      const orderDate = new Date(order.timestamp);
+      const year = orderDate.getFullYear();
+      const month = orderDate.getMonth(); // Get month as 0-11 (0 = January, 11 = December)
+      const yearMonthKey = `${year}-${month + 1}`; // Format as "YYYY-MM" (add 1 to month to make it 1-12)
+
+      // Initialize if not already set
       if (!result[clientId]) {
-        result[clientId] = 0;
+        result[clientId] = {
+          name: clientName, // Store the client name
+          revenueByMonth: {},
+        };
       }
-      result[clientId] += order.totalPrice;
+      if (!result[clientId].revenueByMonth[yearMonthKey]) {
+        result[clientId].revenueByMonth[yearMonthKey] = 0;
+      }
+
+      // Add the order's totalPrice to the appropriate client and month
+      result[clientId].revenueByMonth[yearMonthKey] += order.totalPrice;
       return result;
     }, {});
 
+    // Format the revenue data for response
     const formattedRevenue = Object.entries(revenue).map(
-      ([clientId, total]) => ({
-        _id: clientId,
-        totalRevenue: total,
-      })
+      ([clientId, { name, revenueByMonth }]) => {
+        const monthlyData = Object.entries(revenueByMonth).map(
+          ([yearMonth, total]) => ({
+            month: yearMonth,
+            totalRevenue: total,
+          })
+        );
+
+        return {
+          clientId,
+          clientName: name, // Include client name
+          monthlyRevenue: monthlyData,
+        };
+      }
     );
 
     res.status(200).json(formattedRevenue);
   } catch (error) {
     res.status(500).json({
-      message: "Failed to retrieve revenue by client",
+      message: "Failed to retrieve revenue by client per month",
       error: error.message,
     });
   }
@@ -277,17 +314,17 @@ const getMostSoldProducts = async (req, res) => {
       return result;
     }, {});
 
-    const formattedProducts = Object.entries(products).map(
-      ([productId, details]) => ({
+    const formattedProducts = Object.entries(products)
+      .map(([productId, details]) => ({
         _id: productId,
         productName: details.productName,
         totalSold: details.totalSold,
-      })
-    );
+      }))
+      .sort((a, b) => b.totalSold - a.totalSold); // Sort by total sold
 
-    formattedProducts.sort((a, b) => b.totalSold - a.totalSold);
+    const top10Products = formattedProducts.slice(0, 10); // Get the top 10
 
-    res.status(200).json(formattedProducts);
+    res.status(200).json(top10Products);
   } catch (error) {
     res.status(500).json({
       message: "Failed to retrieve most sold products",
@@ -529,7 +566,7 @@ const getRevenueForCurrentYear = async (req, res) => {
   }
 };
 
-const getRevenueCSV = async (req, res) => {
+const getRevenueExcel = async (req, res) => {
   const superClientId = req.superClientId;
 
   if (!superClientId) {
@@ -580,21 +617,98 @@ const getRevenueCSV = async (req, res) => {
     ];
 
     const formattedRevenue = months.map((monthName, index) => ({
-      month: monthName,
-      revenue: monthlyRevenue[index],
+      Month: monthName,
+      Revenue: monthlyRevenue[index],
     }));
 
-    // Generate CSV
-    const json2csvParser = new Parser({ fields: ["month", "revenue"] });
-    const csv = json2csvParser.parse(formattedRevenue);
+    // Create a new workbook and add a worksheet
+    const workbook = xlsx.utils.book_new();
+    const worksheet = xlsx.utils.json_to_sheet(formattedRevenue);
+    xlsx.utils.book_append_sheet(workbook, worksheet, "Revenue");
 
-    res.header("Content-Type", "text/csv");
-    res.attachment("revenue.csv");
-    return res.send(csv);
+    // Set the headers for downloading the file
+    res.setHeader("Content-Disposition", 'attachment; filename="revenue.xlsx"');
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    // Write the Excel file to the response
+    const buffer = xlsx.write(workbook, { type: "buffer", bookType: "xlsx" });
+    res.send(buffer);
   } catch (error) {
     console.error("Error retrieving yearly revenue:", error);
     res.status(500).json({
       message: "Failed to retrieve yearly revenue",
+      error: error.message,
+    });
+  }
+};
+const getRevenueByProductForCurrentWeek = async (req, res) => {
+  const superClientId = req.superClientId;
+
+  try {
+    const now = new Date();
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())); // Get the start of the week (Sunday)
+    startOfWeek.setHours(0, 0, 0, 0); // Set time to midnight
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // Get the end of the week (Saturday)
+    endOfWeek.setHours(23, 59, 59, 999); // Set time to the end of the day
+
+    const orders = await Order.find({
+      status: "archived",
+      timestamp: {
+        $gte: startOfWeek,
+        $lte: endOfWeek,
+      },
+    })
+      .populate("table")
+      .populate("products.product")
+      .then((orders) =>
+        orders.filter((order) => order.table.superClient.equals(superClientId))
+      );
+
+    const dailyProductRevenue = {};
+
+    for (let i = 0; i <= 6; i++) {
+      const day = new Date(startOfWeek);
+      day.setDate(startOfWeek.getDate() + i);
+      dailyProductRevenue[day.toISOString().split("T")[0]] = {};
+    }
+
+    orders.forEach((order) => {
+      const day = new Date(order.timestamp).toISOString().split("T")[0];
+      if (dailyProductRevenue[day]) {
+        order.products.forEach((product) => {
+          const productId = product.product._id.toString();
+          if (!dailyProductRevenue[day][productId]) {
+            dailyProductRevenue[day][productId] = {
+              productName: product.product.name,
+              totalRevenue: 0,
+            };
+          }
+          dailyProductRevenue[day][productId].totalRevenue +=
+            product.quantity * product.product.price;
+        });
+      }
+    });
+
+    const formattedRevenue = Object.entries(dailyProductRevenue).map(
+      ([date, products]) => ({
+        date,
+        products: Object.entries(products).map(([productId, details]) => ({
+          _id: productId,
+          productName: details.productName,
+          totalRevenue: details.totalRevenue,
+        })),
+      })
+    );
+
+    res.status(200).json(formattedRevenue);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to retrieve weekly product revenue",
       error: error.message,
     });
   }
@@ -610,6 +724,7 @@ module.exports = {
   getRevenueByProductBetweenDates,
   getMonthlyRevenueForSpecificMonth,
   getRevenueForCurrentYear,
-  getRevenueCSV,
+  getRevenueExcel,
   getRevenueByProductByMonth,
+  getRevenueByProductForCurrentWeek,
 };
