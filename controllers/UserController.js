@@ -145,27 +145,35 @@ const resendCode = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    // Get email and password from the request body
+    let { email, password } = req.body;
     const pwd = password;
 
+    // Normalize email: trim spaces and convert to lowercase
+    email = email.trim().toLowerCase();
+
+    // Validate request fields
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       logger.warn("Validation errors in login request");
       return res.status(400).json({ errors: errors.array() });
     }
 
+    // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
       logger.warn(`Invalid login attempt with email ${email}`);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    // Check if password matches
     const passwordMatch = await bcrypt.compare(pwd, user.password);
     if (!passwordMatch) {
       logger.warn(`Invalid login attempt with email ${email}`);
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    // Check if user is verified
     if (!user.verified) {
       logger.warn(`Unverified user ${email} attempting to log in`);
       return res
@@ -173,6 +181,7 @@ const login = async (req, res) => {
         .json({ error: "Please verify your account", userId: user._id });
     }
 
+    // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, role: user.role },
       process.env.JWT_SECRET_KEY,

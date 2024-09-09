@@ -124,6 +124,7 @@ const getRevenueByClient = async (req, res) => {
     // Calculate revenue by client
     const revenue = orders.reduce((result, order) => {
       const clientId = order.user;
+      console.log(clientId);
       const clientName = order.user.fullName;
       const orderDate = new Date(order.timestamp);
       const year = orderDate.getFullYear();
