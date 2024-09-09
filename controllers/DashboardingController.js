@@ -124,8 +124,7 @@ const getRevenueByClient = async (req, res) => {
     // Calculate revenue by client
     const revenue = orders.reduce((result, order) => {
       const clientId = order.user;
-      console.log(clientId);
-      const clientName = order.user.fullName;
+      const clientName = order.user?.fullName;
       const orderDate = new Date(order.timestamp);
       const year = orderDate.getFullYear();
       const month = orderDate.getMonth(); // Get month as 0-11 (0 = January, 11 = December)
@@ -386,7 +385,7 @@ const getOrdersByMonthForYear = async (req, res) => {
   }
 };
 const getRevenueByProductBetweenDates = async (req, res) => {
-  const { superClientId } = req;
+  const superClientId = req.superClientId;
   const { startDate, endDate } = req.body;
 
   if (!startDate || !endDate) {

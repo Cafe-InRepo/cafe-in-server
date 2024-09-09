@@ -7,10 +7,10 @@ const {
   getMostSoldProducts,
   getOrdersByMonthForYear,
   getRevenueForCurrentYear,
-  getRevenueCSV,
   getRevenueByProductByMonth,
   getRevenueByProductForCurrentWeek,
   getRevenueExcel,
+  getRevenueByProductBetweenDates,
 } = require("../controllers/DashboardingController");
 const verifySuperClient = require("../middleWares/VerifySuperClient");
 
@@ -44,6 +44,11 @@ router.get(
   "/revenue-by-product-by-day",
   verifySuperClient,
   getRevenueByProductForCurrentWeek
+);
+router.post(
+  "/revenue-by-product-between-dates",
+  verifySuperClient,
+  getRevenueByProductBetweenDates
 );
 
 module.exports = router;

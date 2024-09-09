@@ -335,7 +335,7 @@ const rateOrderProducts = async (req, res) => {
 const confirmSelectedPayments = async (req, res) => {
   const { orderIds } = req.body;
   console.log("Received order IDs:", orderIds);
-
+  const superId = req.superClientId;
   try {
     if (!Array.isArray(orderIds) || orderIds.length === 0) {
       return res.status(400).json({ message: "No valid order IDs provided" });
@@ -353,7 +353,7 @@ const confirmSelectedPayments = async (req, res) => {
     // Update the orders to mark them as paid
     const updatedOrders = await Order.updateMany(
       { _id: { $in: validOrderIds }, payed: false },
-      { $set: { payed: true } }
+      { $set: { payed: true, user: superId } }
     );
 
     logger.info("Update Result:", updatedOrders); // Log the update result
