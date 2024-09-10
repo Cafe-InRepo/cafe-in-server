@@ -79,14 +79,17 @@ app.use("/menu", menuRoutes);
 app.use("/dashboard", dashboardRoutes);
 
 // Socket.io connection handler
-io.on("connection", (socket) => {
-  logger.info("New client connected");
+io.on("connection", (socket) => {  
+//notification support
+  socket.on("supportRequest", (data) => {
+    logger.info(`Support request from Table ${data.tableNumber}`);
 
+    // Broadcast the support request to all admin/dashboard clients
+    io.emit("supportNotification", { tableNumber: data.tableNumber });
+  });
   socket.on("disconnect", () => {
     logger.info("Client disconnected");
   });
-
-  // Add more socket event handlers here as needed
 });
 
 // Start the server
