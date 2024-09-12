@@ -78,19 +78,26 @@ app.use("/order", orderRoutes);
 app.use("/menu", menuRoutes);
 app.use("/dashboard", dashboardRoutes);
 
-// Socket.io connection handler
-io.on("connection", (socket) => {  
-//notification support
+// Notification support
+io.on("connection", (socket) => {
   socket.on("supportRequest", (data) => {
     logger.info(`Support request from Table ${data.tableNumber}`);
 
     // Broadcast the support request to all admin/dashboard clients
     io.emit("supportNotification", { tableNumber: data.tableNumber });
   });
+
+  // Handle call answer from admin/dashboard
+  socket.on("supportCallAnswered", (data) => {
+    io.emit("callAnswered", { tableNumber: data.tableNumber });
+  });
+
   socket.on("disconnect", () => {
     logger.info("Client disconnected");
   });
 });
+
+
 
 // Start the server
 const port = process.env.PORT || 5000;
