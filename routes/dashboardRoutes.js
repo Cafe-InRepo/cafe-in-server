@@ -11,8 +11,12 @@ const {
   getRevenueByProductForCurrentWeek,
   getRevenueExcel,
   getRevenueByProductBetweenDates,
+  getUserArchivedOrders,
+  closeUserOrders,
 } = require("../controllers/DashboardingController");
 const verifySuperClient = require("../middleWares/VerifySuperClient");
+const verifyClientOrSuperClient = require("../middleWares/verifyClientOrSuperClient");
+const verifyToken = require("../middleWares/jerifyToken");
 
 const router = express.Router();
 
@@ -40,6 +44,9 @@ router.get("/most-sold-products", verifySuperClient, getMostSoldProducts);
 
 router.get("/revenue-year", verifySuperClient, getRevenueForCurrentYear);
 router.get("/revenue-csv", verifySuperClient, getRevenueExcel);
+router.get("/daily-receipt", verifyToken, getUserArchivedOrders);
+router.post("/close-daily", verifyToken, closeUserOrders);
+
 router.get(
   "/revenue-by-product-by-day",
   verifySuperClient,

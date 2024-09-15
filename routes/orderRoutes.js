@@ -14,6 +14,7 @@ const {
 const decodeTableToken = require("../middleWares/decodeTableToken");
 //const verifySuperClient = require("../middleWares/VerifySuperClient");
 const verifyClientOrSuperClient = require("../middleWares/verifyClientOrSuperClient");
+const verifyToken = require("../middleWares/jerifyToken");
 const router = express.Router();
 
 // Define routes for User model
@@ -41,10 +42,6 @@ router.get(
 
 // router.put("/:orderId/increase/:productId", increaseProductQuantity);
 // router.put("/:orderId/decrease/:productId", decreaseProductQuantity);
-router.put(
-  "/confirm/confirm-payment",
-  verifyClientOrSuperClient,
-  confirmSelectedPayments
-);
+router.put("/confirm/confirm-payment", verifyToken, confirmSelectedPayments);
 
 module.exports = router;

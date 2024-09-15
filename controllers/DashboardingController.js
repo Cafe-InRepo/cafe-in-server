@@ -172,6 +172,94 @@ const getRevenueByClient = async (req, res) => {
     });
   }
 };
+const getUserArchivedOrders = async (req, res) => {
+  const userId = req.userId; // Use the authenticated user's ID
+
+  try {
+    // Find orders with 'archived' status, where isClosed is false and the user matches the current user
+    const orders = await Order.find({
+      status: "archived",
+      isClosed: false,
+      user: userId, // Ensure the user matches the authenticated user
+    })
+      .populate("user", "fullName") // Populate 'user' to get fullName
+      .populate({
+        path: "products.product", // Populate the product details inside the order
+        model: "Product", // Reference to the Product model
+        select: "name price", // Include only the 'name' and 'price' fields for the products
+      });
+
+    // Calculate total price for each order and format the product details
+    const orderData = orders.map((order) => ({
+      orderId: order._id,
+      products: order.products.map((productEntry) => ({
+        productId: productEntry.product._id,
+        productName: productEntry.product.name,
+        productPrice: productEntry.product.price,
+        quantity: productEntry.quantity,
+        totalPrice: productEntry.quantity * productEntry.product.price, // Calculate total for each product
+      })),
+      totalPrice: order.totalPrice, // The total price of the entire order
+      timestamp: order.timestamp, // Timestamp when the order was placed
+    }));
+
+    // Calculate the overall total revenue for all orders combined
+    const totalRevenue = orderData.reduce(
+      (acc, order) => acc + order.totalPrice,
+      0
+    );
+
+    // Format the response data
+    const responseData = {
+      orders: orderData, // Array of order details
+      totalRevenue, // Overall total of all orders
+    };
+
+    // Send back the response with orders and total revenue
+    res.status(200).json(responseData);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to retrieve archived orders",
+      error: error.message,
+    });
+  }
+};
+
+const closeUserOrders = async (req, res) => {
+  const userId = req.userId; // Get the current user's ID from the request
+
+  try {
+    // Find and update all orders that match the current user, are archived, and not yet closed
+    const updatedOrders = await Order.updateMany(
+      {
+        user: userId, // Match the current user's orders
+        isClosed: false, // Only update orders where isClosed is false
+        status: "archived", // Ensure the orders are archived
+      },
+      {
+        $set: { isClosed: true }, // Set isClosed to true
+      }
+    );
+
+    // Check if any orders were updated
+    if (updatedOrders.nModified === 0) {
+      return res.status(404).json({
+        message: "No open archived orders found for the current user.",
+      });
+    }
+
+    // Return a success message
+    res.status(200).json({
+      message: "All matching orders have been successfully closed.",
+      updatedOrdersCount: updatedOrders.nModified, // Optional: return the count of updated orders
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to close orders",
+      error: error.message,
+    });
+  }
+};
 
 const getRevenueByProduct = async (req, res) => {
   const superClientId = req.superClientId;
@@ -727,4 +815,6 @@ module.exports = {
   getRevenueExcel,
   getRevenueByProductByMonth,
   getRevenueByProductForCurrentWeek,
+  getUserArchivedOrders,
+  closeUserOrders
 };

@@ -335,7 +335,7 @@ const rateOrderProducts = async (req, res) => {
 const confirmSelectedPayments = async (req, res) => {
   const { orderIds } = req.body;
   console.log("Received order IDs:", orderIds);
-  const superId = req.superClientId;
+  const superId = req.userId;
   try {
     if (!Array.isArray(orderIds) || orderIds.length === 0) {
       return res.status(400).json({ message: "No valid order IDs provided" });
