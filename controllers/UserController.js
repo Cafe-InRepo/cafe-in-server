@@ -357,21 +357,29 @@ const loginTable = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       logger.warn(`Invalid credentials provided for email ${email}`);
+      console.log(`Invalid credentials provided for email ${email}`);
+
       return res.status(400).json({ msg: "Invalid credentials" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       logger.warn(`Invalid credentials provided for email ${email}`);
+      console.log(`Invalid credentials provided for email ${email}`);
+
       return res.status(400).json({ msg: "Invalid credentials" });
     }
 
     if (user.role !== "superClient" && user.role !== "client") {
       logger.warn(`Unauthorized login attempt by user ${email}`);
+      console.log(`Unauthorized login attempt by user ${email}`);
+
       return res.status(403).json({ msg: "User not authorized" });
     }
     if (user.verified !== true) {
       logger.warn(`user ${email} is not active and trying to open a table`);
+      console.log(`user ${email} is not active and trying to open a table`);
+
       return res.status(403).json({ msg: "User not active" });
     }
 

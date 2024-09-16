@@ -229,29 +229,34 @@ const closeUserOrders = async (req, res) => {
   const userId = req.userId; // Get the current user's ID from the request
 
   try {
-    // Find and update all orders that match the current user, are archived, and not yet closed
-    const updatedOrders = await Order.updateMany(
+    // Find all orders that match the current user, are archived, and not yet closed
+    const ordersToClose = await Order.find({
+      user: userId, // Match the current user's orders
+      isClosed: false, // Only find orders where isClosed is false
+      status: "archived", // Ensure the orders are archived
+    }).populate("products.product"); // Populate the product details
+
+    // If no matching orders are found, return a 404 response
+    if (ordersToClose.length === 0) {
+      return res.status(404).json({
+        message: "No open archived orders found for the current user.",
+      });
+    }
+
+    // Perform the update to set isClosed to true
+    await Order.updateMany(
       {
-        user: userId, // Match the current user's orders
-        isClosed: false, // Only update orders where isClosed is false
-        status: "archived", // Ensure the orders are archived
+        _id: { $in: ordersToClose.map((order) => order._id) }, // Update only the found orders
       },
       {
         $set: { isClosed: true }, // Set isClosed to true
       }
     );
 
-    // Check if any orders were updated
-    if (updatedOrders.nModified === 0) {
-      return res.status(404).json({
-        message: "No open archived orders found for the current user.",
-      });
-    }
-
-    // Return a success message
+    // Return the modified orders with populated products
     res.status(200).json({
       message: "All matching orders have been successfully closed.",
-      updatedOrdersCount: updatedOrders.nModified, // Optional: return the count of updated orders
+      closedOrders: ordersToClose, // Return the orders that were closed with product details
     });
   } catch (error) {
     res.status(500).json({
@@ -816,5 +821,5 @@ module.exports = {
   getRevenueByProductByMonth,
   getRevenueByProductForCurrentWeek,
   getUserArchivedOrders,
-  closeUserOrders
+  closeUserOrders,
 };
