@@ -422,6 +422,55 @@ const loginTable = async (req, res) => {
     res.status(500).send("Server error");
   }
 };
+
+//QR login
+
+const qrLogin = async (req, res) => {
+  const { token } = req.body; // Now only getting the token from the query
+  try {
+    // Verify the token and decode the payload
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET_KEY);
+
+    // Extract the table number directly from the decoded token payload
+    const { number: tableNumber, superClient } = decodedToken;
+
+    // Find the table based on the table number
+    const tableData = await Table.findOne({
+      number: tableNumber, // Use table number decoded from token
+      superClient: superClient,
+    });
+
+    if (!tableData) {
+      return res.status(400).json({ msg: "Table not found or not authorized" });
+    }
+
+    // Create a session or token for the logged-in user
+    const payload = {
+      user: {
+        id: decodedToken.superClient, // Get the user ID from the token
+        role: "superClient", // Use the role in case you need to handle superClient
+      },
+      table: {
+        id: tableData._id,
+        number: tableData.number,
+      },
+    };
+
+    jwt.sign(
+      payload,
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: "24h" },
+      (err, newToken) => {
+        if (err) throw err;
+
+        res.json({ token: newToken, message: "Logged in successfully" });
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
 const getClientsBySuperClientId = async (req, res) => {
   try {
     const superClientId = req.superClientId; // Retrieved from the middleware
@@ -591,4 +640,5 @@ module.exports = {
   updateUser,
   deleteUser,
   changeUserVerificationStatus,
+  qrLogin,
 };

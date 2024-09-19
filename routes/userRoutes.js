@@ -13,6 +13,7 @@ const {
   deleteUser,
   updateUser,
   changeUserVerificationStatus,
+  qrLogin,
 } = require("../controllers/UserController");
 const verifyToken = require("../middleWares/jerifyToken");
 const verifySuperClient = require("../middleWares/VerifySuperClient");
@@ -27,6 +28,7 @@ router.put("/changepwd", verifyToken, changePassword);
 router.post("/verifyUser", CodeVerification);
 router.post("/resendcode", resendCode);
 router.post("/login-table", loginTable);
+router.post("/login-qr", qrLogin);
 
 //routes for superClient
 router.get(

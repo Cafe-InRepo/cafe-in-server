@@ -22,6 +22,10 @@ const tableSchema = new Schema({
       ref: "Order",
     },
   ],
+  qrCode: {
+    type: String, // Will store the QR code as a data URL (base64 string)
+    required: false,
+  },
 });
 
 // Create a compound unique index

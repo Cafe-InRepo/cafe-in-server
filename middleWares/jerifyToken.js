@@ -14,7 +14,7 @@ const verifyToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
     req.userId = decoded.userId;
-    req.superClientId = decoded.table?.superClient;
+    req.superClientId = decoded.table?.superClient || decoded.user?.id;
     req.role = decoded.role; // Add role to the request object
     next();
   } catch (error) {

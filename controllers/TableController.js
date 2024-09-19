@@ -1,7 +1,8 @@
 const Order = require("../models/Order");
 const Table = require("../models/Table");
+const jwt = require("jsonwebtoken");
+const QRCode = require("qrcode");
 
-// Create a new table
 const createTable = async (req, res) => {
   try {
     const superClient = req.superClientId;
@@ -21,7 +22,38 @@ const createTable = async (req, res) => {
     });
 
     const savedTable = await newTable.save();
-    res.status(201).json(savedTable);
+
+    // Create payload for JWT, including the table number
+    const payload = {
+      tableId: savedTable._id,
+      number: savedTable.number, // Add table number to token payload
+      superClient: savedTable.superClient,
+    };
+
+    // Generate a JWT for the table
+    const token = jwt.sign(payload, process.env.JWT_SECRET_KEY, {
+      expiresIn: "24h",
+    });
+
+    // Generate QR code with the JWT token
+    const qrCodeData = `https://main--subtle-pika-be6020.netlify.app/login?token=${token}`;
+
+    // Generate QR Code Image (base64 data URL)
+    QRCode.toDataURL(qrCodeData, async (err, url) => {
+      if (err) {
+        return res.status(500).json({ error: "Failed to generate QR code" });
+      }
+
+      // Update the table with the QR code URL (base64 string)
+      savedTable.qrCode = url;
+      await savedTable.save();
+
+      // Return the table details including the QR code
+      res.status(201).json({
+        table: savedTable,
+        qrCodeUrl: url, // This is the generated QR code as a data URL
+      });
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -72,6 +104,7 @@ const getTablesWithUnpaiedOrders = async (req, res) => {
     const tablesWithUnpaidOrders = tables.map((table) => ({
       ...table.toObject(),
       unpaidOrders: table.orders.length > 0,
+      qrCode: table.qrCode, // Include the QR code field
     }));
 
     res.status(200).json(tablesWithUnpaidOrders);
@@ -82,6 +115,7 @@ const getTablesWithUnpaiedOrders = async (req, res) => {
     });
   }
 };
+
 const getTableById = async (req, res) => {
   try {
     const { id } = req.params;
