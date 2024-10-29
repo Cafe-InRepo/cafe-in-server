@@ -1,3 +1,4 @@
+const { baseUrl } = require("../Helpers/BaseUrl");
 const Order = require("../models/Order");
 const Table = require("../models/Table");
 const jwt = require("jsonwebtoken");
@@ -36,7 +37,7 @@ const createTable = async (req, res) => {
     });
 
     // Generate QR code with the JWT token
-    const qrCodeData = `https://main--subtle-pika-be6020.netlify.app/login?token=${token}`;
+    const qrCodeData = `${baseUrl}/login?token=${token}`;
 
     // Generate QR Code Image (base64 data URL)
     QRCode.toDataURL(qrCodeData, async (err, url) => {
@@ -80,16 +81,31 @@ const updateTable = (req, res) => {
     .catch((error) => res.status(500).json({ error: error.message }));
 };
 
-// Delete a table
-const deleteTable = (req, res) => {
-  Table.findOneAndDelete({ _id: req.params.id, user: req.userId })
-    .then((table) => {
-      if (!table) {
-        return res.status(404).send("Table not found");
-      }
-      res.status(204).send();
-    })
-    .catch((error) => res.status(500).json({ error: error.message }));
+
+// Delete a table and its associated orders
+const deleteTable = async (req, res) => {
+  try {
+    // Find the table by ID and userId
+    const table = await Table.findOne({
+      _id: req.params.id,
+      user: req.userId,
+    }).populate("orders");
+
+    if (!table) {
+      return res.status(404).send("Table not found");
+    }
+
+    // Delete all orders associated with the table
+    await Order.deleteMany({ _id: { $in: table.orders } });
+
+    // Delete the table
+    await Table.findByIdAndDelete(req.params.id);
+
+    res.status(204).send(); // No content response after deletion
+  } catch (error) {
+    console.error("Error deleting table and orders:", error);
+    res.status(500).json({ error: error.message });
+  }
 };
 
 const getTablesWithUnpaiedOrders = async (req, res) => {

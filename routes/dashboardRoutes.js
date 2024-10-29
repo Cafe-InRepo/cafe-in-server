@@ -13,6 +13,9 @@ const {
   getRevenueByProductBetweenDates,
   getUserArchivedOrders,
   closeUserOrders,
+  getWeeklyRevenue,
+  getRevenueBetweenDates,
+  getMonthlyGrowthRate,
 } = require("../controllers/DashboardingController");
 const verifySuperClient = require("../middleWares/VerifySuperClient");
 const verifyClientOrSuperClient = require("../middleWares/verifyClientOrSuperClient");
@@ -27,6 +30,19 @@ router.get("/year-per-month", verifySuperClient, getOrdersByMonthForYear);
 
 // Route to get monthly revenue
 router.get("/monthly-revenue", verifySuperClient, getMonthlyRevenue);
+
+//growth current & previous month
+router.get("/monthly-revenue-growth", verifySuperClient, getMonthlyGrowthRate);
+
+// Route to get revenue for current week
+router.get("/weekly-revenue", verifySuperClient, getWeeklyRevenue);
+
+// Route to get revenue between 2 dates
+router.post(
+  "/revenue-between-dates",
+  verifySuperClient,
+  getRevenueBetweenDates
+);
 
 // Route to get revenue by client
 router.get("/revenue-by-client", verifySuperClient, getRevenueByClient);

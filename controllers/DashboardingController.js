@@ -44,7 +44,7 @@ const getDailyRevenue = async (req, res) => {
     });
   }
 };
-
+//get revenues for current month
 const getMonthlyRevenue = async (req, res) => {
   const superClientId = req.superClientId;
 
@@ -95,6 +95,285 @@ const getMonthlyRevenue = async (req, res) => {
     });
   }
 };
+// growth current & previous month
+const getMonthlyGrowthRate = async (req, res) => {
+  const superClientId = req.superClientId;
+
+  if (!superClientId) {
+    return res.status(400).json({ message: "SuperClientId is required" });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(superClientId)) {
+    return res.status(400).json({ message: "Invalid SuperClientId format" });
+  }
+
+  try {
+    const currentDate = new Date();
+    const startOfCurrentMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1
+    );
+    const startOfPreviousMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() - 1,
+      1
+    );
+    const endOfPreviousMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      0
+    ); // Last day of the previous month
+
+    // Fetch orders for the current month
+    const currentMonthOrders = await Order.find({
+      status: "archived",
+      timestamp: { $gte: startOfCurrentMonth },
+    }).populate("table");
+
+    // Filter by superClientId for the current month
+    const currentMonthFilteredOrders = currentMonthOrders.filter((order) =>
+      order.table.superClient.equals(superClientId)
+    );
+
+    // Calculate current month revenue
+    const currentMonthRevenue = currentMonthFilteredOrders.reduce(
+      (total, order) => total + order.totalPrice,
+      0
+    );
+
+    // Fetch orders for the previous month
+    const previousMonthOrders = await Order.find({
+      status: "archived",
+      timestamp: { $gte: startOfPreviousMonth, $lte: endOfPreviousMonth },
+    }).populate("table");
+
+    // Filter by superClientId for the previous month
+    const previousMonthFilteredOrders = previousMonthOrders.filter((order) =>
+      order.table.superClient.equals(superClientId)
+    );
+
+    // Calculate previous month revenue
+    const previousMonthRevenue = previousMonthFilteredOrders.reduce(
+      (total, order) => total + order.totalPrice,
+      0
+    );
+
+    // Calculate growth rate
+    let growthRate = 0;
+    if (previousMonthRevenue > 0) {
+      growthRate =
+        ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) *
+        100;
+    } else if (currentMonthRevenue > 0) {
+      growthRate = 100; // If there's no revenue in the previous month and some revenue in the current month, growth rate is 100%
+    }
+
+    res.status(200).json({
+      currentMonthRevenue,
+      previousMonthRevenue,
+      growthRate: growthRate.toFixed(2), // Limiting to 2 decimal places
+    });
+  } catch (error) {
+    console.error("Error retrieving monthly growth rate:", error);
+    res.status(500).json({
+      message: "Failed to retrieve monthly growth rate",
+      error: error.message,
+    });
+  }
+};
+
+//get revenues for current week
+const getWeeklyRevenue = async (req, res) => {
+  const superClientId = req.superClientId;
+
+  if (!superClientId) {
+    return res.status(400).json({ message: "SuperClientId is required" });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(superClientId)) {
+    return res.status(400).json({ message: "Invalid SuperClientId format" });
+  }
+
+  try {
+    // Get the current date and set the time to the start of today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of the current day
+
+    // Calculate the start date for the current week (6 days before today)
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - 6); // 6 days before today
+
+    // Set the end date to the end of today for the current week
+    const endDate = new Date(today);
+    endDate.setHours(23, 59, 59, 999); // End of the current day
+
+    // Calculate the previous week's start and end date
+    const prevStartDate = new Date(startDate);
+    prevStartDate.setDate(startDate.getDate() - 7); // Previous week's start
+
+    const prevEndDate = new Date(startDate);
+    prevEndDate.setHours(23, 59, 59, 999); // Previous week's end
+
+    // Fetch current week's orders
+    const currentWeekOrders = await Order.find({
+      status: "archived",
+      timestamp: { $gte: startDate, $lte: endDate },
+    })
+      .populate({
+        path: "table",
+        match: { superClient: superClientId },
+      })
+      .exec();
+
+    // Fetch previous week's orders
+    const prevWeekOrders = await Order.find({
+      status: "archived",
+      timestamp: { $gte: prevStartDate, $lte: prevEndDate },
+    })
+      .populate({
+        path: "table",
+        match: { superClient: superClientId },
+      })
+      .exec();
+
+    // Filter orders that do not have a matching superClient
+    const filteredCurrentWeekOrders = currentWeekOrders.filter(
+      (order) => order.table !== null
+    );
+    const filteredPrevWeekOrders = prevWeekOrders.filter(
+      (order) => order.table !== null
+    );
+
+    // Calculate total revenue for current and previous week
+    const currentWeekRevenue = filteredCurrentWeekOrders.reduce(
+      (total, order) => total + order.totalPrice,
+      0
+    );
+    const prevWeekRevenue = filteredPrevWeekOrders.reduce(
+      (total, order) => total + order.totalPrice,
+      0
+    );
+
+    // Calculate growth rate between current and previous week
+    const growthRate =
+      prevWeekRevenue > 0
+        ? ((currentWeekRevenue - prevWeekRevenue) / prevWeekRevenue) * 100
+        : 0;
+
+    // Calculate daily revenue for each day in the current week
+    const dailyRevenue = filteredCurrentWeekOrders.reduce((result, order) => {
+      const day = order.timestamp.getDate();
+      if (!result[day]) {
+        result[day] = 0;
+      }
+      result[day] += order.totalPrice;
+      return result;
+    }, {});
+
+    // Format daily revenue data for response
+    const formattedRevenue = Object.entries(dailyRevenue).map(
+      ([day, total]) => ({
+        _id: { day: parseInt(day) },
+        dailyRevenue: total,
+      })
+    );
+
+    res.status(200).json({
+      currentWeekRevenue,
+      prevWeekRevenue,
+      growthRate,
+      dailyRevenue: formattedRevenue,
+    });
+  } catch (error) {
+    console.error("Error retrieving weekly revenue:", error);
+    res.status(500).json({
+      message: "Failed to retrieve weekly revenue",
+      error: error.message,
+    });
+  }
+};
+
+//get revenue between 2 dates
+const getRevenueBetweenDates = async (req, res) => {
+  const { startDate, endDate } = req.body;
+  const superClientId = req.superClientId;
+
+  if (!superClientId) {
+    return res.status(400).json({ message: "SuperClientId is required" });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(superClientId)) {
+    return res.status(400).json({ message: "Invalid SuperClientId format" });
+  }
+
+  // If no startDate or endDate is provided, set them to today and 14 days before
+  const currentDate = new Date();
+  const defaultEndDate = new Date(currentDate.setHours(23, 59, 59, 999)); // End of today
+  const defaultStartDate = new Date();
+  defaultStartDate.setDate(defaultStartDate.getDate() - 14); // 14 days before today
+  defaultStartDate.setHours(0, 0, 0, 0); // Start of the day 14 days ago
+
+  // Use the provided dates or fall back to the default range
+  const start = startDate ? new Date(startDate) : defaultStartDate;
+  const end = endDate ? new Date(endDate) : defaultEndDate;
+
+  // Validate dates
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return res.status(400).json({ message: "Invalid date format" });
+  }
+
+  try {
+    const orders = await Order.find({
+      status: "archived",
+      timestamp: { $gte: start, $lte: end },
+    }).populate("table");
+
+    const filteredOrders = orders.filter((order) =>
+      order.table.superClient.equals(superClientId)
+    );
+
+    // If no orders found, return an appropriate response
+    if (filteredOrders.length === 0) {
+      return res.status(200).json({ message: "No revenue found for the given date range." });
+    }
+
+    const revenue = filteredOrders.reduce((result, order) => {
+      const year = order.timestamp.getFullYear();
+      const month = order.timestamp.getMonth() + 1; // Months are zero-indexed in JS, so add 1
+      const day = order.timestamp.getDate();
+
+      // Create a unique key for each year, month, and day combination
+      const key = `${year}-${month}-${day}`;
+
+      if (!result[key]) {
+        result[key] = 0;
+      }
+
+      result[key] += order.totalPrice;
+      return result;
+    }, {});
+
+    // Format the revenue data with year, month, and day
+    const formattedRevenue = Object.entries(revenue).map(([key, total]) => {
+      const [year, month, day] = key.split("-").map(Number);
+
+      return {
+        _id: { year, month, day },
+        dailyRevenue: total,
+      };
+    });
+
+    res.status(200).json(formattedRevenue);
+  } catch (error) {
+    console.error("Error retrieving revenue between dates:", error);
+    res.status(500).json({
+      message: "Failed to retrieve revenue between dates",
+      error: error.message,
+    });
+  }
+};
+
 
 const getRevenueByClient = async (req, res) => {
   const superClientId = req.superClientId; // Assuming you get this from authentication
@@ -822,4 +1101,7 @@ module.exports = {
   getRevenueByProductForCurrentWeek,
   getUserArchivedOrders,
   closeUserOrders,
+  getWeeklyRevenue,
+  getRevenueBetweenDates,
+  getMonthlyGrowthRate,
 };
