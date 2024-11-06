@@ -14,6 +14,10 @@ const orderSchema = new Schema({
         required: true,
         default: 1,
       },
+      payedQuantity: { // New field to track the number of units paid
+        type: Number,
+        default: 0,
+      },
     },
   ],
   table: {

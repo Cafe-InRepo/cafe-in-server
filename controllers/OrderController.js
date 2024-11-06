@@ -399,6 +399,91 @@ const confirmSelectedPayments = async (req, res) => {
   }
 };
 
+const confirmSelectedProductsPayments = async (req, res) => {
+  const { orderId, productIds } = req.body;
+  const superId = req.userId;
+  try {
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ message: "Invalid order ID provided" });
+    }
+
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return res.status(400).json({ message: "No valid product IDs provided" });
+    }
+
+    // Validate each productId and remove suffix
+    const validProductIds = productIds
+      .map((id) => id.split("-")[0]) // Remove instance suffix
+      .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+    if (validProductIds.length === 0) {
+      return res.status(400).json({ message: "No valid product IDs found" });
+    }
+
+    // Find the order and update the payment status of the specified products
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const updatedProducts = order.products.map((product) => {
+      // Check if this product is one of the selected products
+      if (validProductIds.includes(product.product.toString())) {
+        // Calculate how many products are being paid for
+        const selectedCount = productIds.filter(
+          (id) => id.split("-")[0] === product.product.toString()
+        ).length;
+
+        // If there is still a remaining quantity to pay for
+        if (product.payedQuantity < product.quantity) {
+          const remainingQuantity = product.quantity - product.payedQuantity;
+          const quantityToPay = Math.min(selectedCount, remainingQuantity); // Ensure we don't overpay
+
+          product.payedQuantity += quantityToPay; // Update payedQuantity
+        }
+      }
+      return product;
+    });
+
+    order.products = updatedProducts;
+
+    // Check if all products in the order are fully paid, and if so, set order's payed status to true
+    const allProductsPaid = order.products.every(
+      (product) => product.payedQuantity >= product.quantity
+    );
+
+    if (allProductsPaid) {
+      order.payed = true;
+    }
+
+    await order.save();
+
+    // Check if the table associated with this order has any unpaid orders
+    const unpaidOrders = await Order.find({ table: order.table, payed: false });
+
+    // If no unpaid orders remain for the table, archive all orders for that table
+    if (unpaidOrders.length === 0) {
+      await Order.updateMany(
+        { table: order.table },
+        { $set: { status: "archived", user: superId } }
+      );
+    }
+
+    res.status(200).json({
+      message:
+        "Selected products confirmed as paid, and table orders archived if needed",
+      updatedOrder: order,
+    });
+  } catch (error) {
+    console.error("Error confirming selected products payments:", error);
+    res.status(500).json({
+      message: "Error confirming selected products payments",
+      error: error.message,
+    });
+  }
+};
+
 // Confirm payment for all unpaid orders associated with a table
 // const confirmAllPayments = async (req, res) => {
 //   const { tableId } = req.params;
@@ -529,4 +614,5 @@ module.exports = {
   //confirmAllPayments,
   getOrdersBySuperClientIdFIFO,
   updateOrderStatus,
+  confirmSelectedProductsPayments,
 };

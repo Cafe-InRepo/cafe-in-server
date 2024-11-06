@@ -10,6 +10,7 @@ const {
   confirmSelectedPayments,
   getOrdersBySuperClientIdFIFO,
   updateOrderStatus,
+  confirmSelectedProductsPayments,
 } = require("../controllers/OrderController");
 const decodeTableToken = require("../middleWares/decodeTableToken");
 //const verifySuperClient = require("../middleWares/VerifySuperClient");
@@ -43,5 +44,7 @@ router.get(
 // router.put("/:orderId/increase/:productId", increaseProductQuantity);
 // router.put("/:orderId/decrease/:productId", decreaseProductQuantity);
 router.put("/confirm/confirm-payment", verifyToken, confirmSelectedPayments);
+router.put("/confirm/confirm-products-payment", verifyToken, confirmSelectedProductsPayments);
+
 
 module.exports = router;
