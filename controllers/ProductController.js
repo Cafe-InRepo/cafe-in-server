@@ -201,6 +201,44 @@ const changeProductAvailability = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+const getProductRatingsBySuperClient = async (req, res) => {
+  const superClientId = req.superClientId; // Assuming this is set by middleware
+
+  try {
+    // Find the menu for the given superClient
+    const menu = await Menu.findOne({ user: superClientId }).populate({
+      path: 'categories',
+      populate: {
+        path: 'products',
+        model: 'Product',
+      },
+    });
+
+    if (!menu) {
+      return res.status(404).json({ message: 'Menu not found for this superClient' });
+    }
+
+    // Extract product ratings from the menu
+    const productRatings = [];
+    menu.categories.forEach((category) => {
+      category.products.forEach((product) => {
+        productRatings.push({
+          productId: product._id,
+          productName: product.name,
+          rate: product.rate,
+          raters: product.raters,
+          price: product.price,
+        });
+      });
+    });
+
+    res.status(200).json(productRatings);
+  } catch (error) {
+    console.error('Error retrieving product ratings:', error);
+    res.status(500).json({ message: 'Failed to retrieve product ratings', error: error.message });
+  }
+};
+
 
 module.exports = {
   createProduct,
@@ -208,4 +246,5 @@ module.exports = {
   deleteProduct,
   getMenuProducts,
   changeProductAvailability,
+  getProductRatingsBySuperClient
 };
