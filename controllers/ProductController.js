@@ -26,10 +26,21 @@ const createProduct = async (req, res) => {
       return res.status(400).json({ error: "Category ID is required" });
     }
 
+    // Validate image format from Base64 string
+    const allowedFormats = ["jpg", "jpeg", "png"];
+    const matches = img.match(/^data:image\/(png|jpe?g);base64,/);
+    if (!matches || !allowedFormats.includes(matches[1])) {
+      return res.status(400).json({
+        error: `Invalid image format. Only ${allowedFormats.join(
+          ", "
+        )} formats are allowed.`,
+      });
+    }
+
     // Upload product image to Cloudinary
     const uploadedImage = await cloudinary.uploader.upload(img, {
       public_id: `cafein-product_images/${name.trim()}`, // Use a meaningful identifier for the file name
-      allowed_formats: ["jpg", "jpeg", "png"], // Allow only specific image formats
+      allowed_formats: allowedFormats, // Allow only specific image formats
     });
 
     // Create the new product
@@ -69,6 +80,21 @@ const updateProduct = async (req, res) => {
     const { productId } = req.params;
     const { name, description, price, img, available } = req.body;
 
+    // Validate required fields
+    if (!name) {
+      return res.status(400).json({ error: "Product name is required" });
+    }
+    if (!description) {
+      return res.status(400).json({ error: "Product description is required" });
+    }
+    if (!price) {
+      return res.status(400).json({ error: "Product price is required" });
+    }
+    if (img && typeof img !== "string") {
+      return res.status(400).json({ error: "Invalid image format" });
+    }
+
+    // Find the product
     const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
@@ -77,10 +103,23 @@ const updateProduct = async (req, res) => {
     // If a new image is uploaded, handle the Cloudinary upload and delete the old image
     let updatedImg = product.img;
     if (img && img !== product.img) {
+      // Validate image format from Base64 string
+      const allowedFormats = ["jpg", "jpeg", "png"];
+      const matches = img.match(/^data:image\/(png|jpe?g);base64,/);
+      if (!matches || !allowedFormats.includes(matches[1])) {
+        return res
+          .status(400)
+          .json({
+            error: `Invalid image format. Only ${allowedFormats.join(
+              ", "
+            )} formats are allowed.`,
+          });
+      }
+
       // Upload the new image to Cloudinary
       const uploadedImage = await cloudinary.uploader.upload(img, {
         public_id: `cafein-product_images/${name.trim()}`, // Use a meaningful identifier for the file name
-        allowed_formats: ["jpg", "jpeg", "png"], // Allow only specific image formats
+        allowed_formats: allowedFormats, // Allow only specific image formats
       });
 
       updatedImg = uploadedImage.secure_url;
@@ -92,6 +131,7 @@ const updateProduct = async (req, res) => {
       );
     }
 
+    // Update product fields
     product.name = name;
     product.description = description;
     product.price = price;
@@ -207,15 +247,17 @@ const getProductRatingsBySuperClient = async (req, res) => {
   try {
     // Find the menu for the given superClient
     const menu = await Menu.findOne({ user: superClientId }).populate({
-      path: 'categories',
+      path: "categories",
       populate: {
-        path: 'products',
-        model: 'Product',
+        path: "products",
+        model: "Product",
       },
     });
 
     if (!menu) {
-      return res.status(404).json({ message: 'Menu not found for this superClient' });
+      return res
+        .status(404)
+        .json({ message: "Menu not found for this superClient" });
     }
 
     // Extract product ratings from the menu
@@ -234,11 +276,13 @@ const getProductRatingsBySuperClient = async (req, res) => {
 
     res.status(200).json(productRatings);
   } catch (error) {
-    console.error('Error retrieving product ratings:', error);
-    res.status(500).json({ message: 'Failed to retrieve product ratings', error: error.message });
+    console.error("Error retrieving product ratings:", error);
+    res.status(500).json({
+      message: "Failed to retrieve product ratings",
+      error: error.message,
+    });
   }
 };
-
 
 module.exports = {
   createProduct,
@@ -246,5 +290,5 @@ module.exports = {
   deleteProduct,
   getMenuProducts,
   changeProductAvailability,
-  getProductRatingsBySuperClient
+  getProductRatingsBySuperClient,
 };
