@@ -30,7 +30,13 @@ const io = socketIo(server, {
 
 // Enable CORS
 const cors = require("cors");
-app.use(cors("*"));
+app.use(
+  cors({
+    origin: "*", // Allow only this specific origin
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    credentials: true, // Include this if you need to allow credentials like cookies or HTTP authentication
+  })
+);
 
 // Middleware
 app.use(bodyParser.json({ limit: "50mb" }));
@@ -96,8 +102,6 @@ io.on("connection", (socket) => {
     logger.info("Client disconnected");
   });
 });
-
-
 
 // Start the server
 const port = process.env.PORT || 5000;
