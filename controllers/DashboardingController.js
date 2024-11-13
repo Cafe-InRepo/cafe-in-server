@@ -335,7 +335,9 @@ const getRevenueBetweenDates = async (req, res) => {
 
     // If no orders found, return an appropriate response
     if (filteredOrders.length === 0) {
-      return res.status(200).json({ message: "No revenue found for the given date range." });
+      return res
+        .status(200)
+        .json({ message: "No revenue found for the given date range." });
     }
 
     const revenue = filteredOrders.reduce((result, order) => {
@@ -373,7 +375,6 @@ const getRevenueBetweenDates = async (req, res) => {
     });
   }
 };
-
 
 const getRevenueByClient = async (req, res) => {
   const superClientId = req.superClientId; // Assuming you get this from authentication
@@ -453,6 +454,7 @@ const getRevenueByClient = async (req, res) => {
 };
 const getUserArchivedOrders = async (req, res) => {
   const userId = req.userId; // Use the authenticated user's ID
+  console.log(userId);
 
   try {
     // Find orders with 'archived' status, where isClosed is false and the user matches the current user
@@ -472,11 +474,11 @@ const getUserArchivedOrders = async (req, res) => {
     const orderData = orders.map((order) => ({
       orderId: order._id,
       products: order.products.map((productEntry) => ({
-        productId: productEntry.product._id,
-        productName: productEntry.product.name,
-        productPrice: productEntry.product.price,
+        productId: productEntry.product,
+        productName: productEntry.name,
+        productPrice: productEntry.price,
         quantity: productEntry.quantity,
-        totalPrice: productEntry.quantity * productEntry.product.price, // Calculate total for each product
+        totalPrice: productEntry.quantity * productEntry.price, // Calculate total for each product
       })),
       totalPrice: order.totalPrice, // The total price of the entire order
       timestamp: order.timestamp, // Timestamp when the order was placed
@@ -501,6 +503,7 @@ const getUserArchivedOrders = async (req, res) => {
       message: "Failed to retrieve archived orders",
       error: error.message,
     });
+    console.log(error);
   }
 };
 

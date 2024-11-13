@@ -336,6 +336,7 @@ const confirmSelectedPayments = async (req, res) => {
   const { orderIds } = req.body;
   console.log("Received order IDs:", orderIds);
   const superId = req.userId;
+  console.log(superId);
   try {
     if (!Array.isArray(orderIds) || orderIds.length === 0) {
       return res.status(400).json({ message: "No valid order IDs provided" });
@@ -378,7 +379,7 @@ const confirmSelectedPayments = async (req, res) => {
           // Archive all orders for this table
           return Order.updateMany(
             { table: tableId },
-            { $set: { status: "archived" } }
+            { $set: { status: "archived", user: superId } }
           );
         }
       })
@@ -402,6 +403,7 @@ const confirmSelectedPayments = async (req, res) => {
 const confirmSelectedProductsPayments = async (req, res) => {
   const { orderId, productIds } = req.body;
   const superId = req.userId;
+  console.log(superId);
   try {
     if (!mongoose.Types.ObjectId.isValid(orderId)) {
       return res.status(400).json({ message: "Invalid order ID provided" });
