@@ -14,7 +14,8 @@ const orderSchema = new Schema({
         required: true,
         default: 1,
       },
-      payedQuantity: { // New field to track the number of units paid
+      payedQuantity: {
+        // New field to track the number of units paid
         type: Number,
         default: 0,
       },
@@ -29,6 +30,12 @@ const orderSchema = new Schema({
     type: String,
     enum: ["pending", "preparing", "completed", "archived"],
     default: "pending",
+  },
+  statusTimestamps: {
+    pending: { type: Date, default: null },
+    preparing: { type: Date, default: null },
+    completed: { type: Date, default: null },
+    archived: { type: Date, default: null },
   },
   payed: {
     type: Boolean,
@@ -45,6 +52,7 @@ const orderSchema = new Schema({
     type: Boolean,
     default: false,
   },
+  //isClosed is used to get the receipit non-closed orders
   isClosed: {
     type: Boolean,
     default: false,
@@ -55,6 +63,42 @@ const orderSchema = new Schema({
     required: false,
   },
 });
+// the trigger is used to calculate each time the order spent in each status
+orderSchema.pre("save", function (next) {
+  if (this.isModified("status")) {
+    const status = this.status;
+    if (!this.statusTimestamps[status]) {
+      this.statusTimestamps[status] = new Date();
+    }
+  }
+  next();
+});
+
+orderSchema.methods.getStatusDurations = function () {
+  const durations = {};
+  const timestamps = this.statusTimestamps;
+
+  const statuses = ["pending", "preparing", "completed", "archived"];
+
+  // Iterate over statuses to calculate durations
+  for (let i = 0; i < statuses.length; i++) {
+    const currentStatus = statuses[i];
+    const nextStatus = statuses[i + 1];
+
+    if (timestamps[currentStatus]) {
+      // If there's a next status, calculate duration between current and next status
+      if (nextStatus && timestamps[nextStatus]) {
+        durations[currentStatus] =
+          timestamps[nextStatus] - timestamps[currentStatus];
+      } else {
+        // For the last status (no next status), calculate time until now
+        durations[currentStatus] = Date.now() - timestamps[currentStatus];
+      }
+    }
+  }
+
+  return durations; // returns durations in milliseconds
+};
 
 const Order = mongoose.model("Order", orderSchema);
 module.exports = Order;

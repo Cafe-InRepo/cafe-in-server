@@ -1088,6 +1088,69 @@ const getRevenueByProductForCurrentWeek = async (req, res) => {
     });
   }
 };
+const getAverageProcessingTime = async (req, res) => {
+  const { startDate, endDate } = req.body;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({
+      message: "Start date and end date are required",
+    });
+  }
+
+  try {
+    // Query orders based on timestamp (within the date range)
+    const orders = await Order.find({
+      timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) },
+      status: { $in: ["pending", "preparing", "completed"] },
+    });
+
+    let pendingToPreparingDurations = [];
+    let preparingToCompletedDurations = [];
+
+    // Calculate durations for each order
+    orders.forEach((order) => {
+      const statusDurations = order.getStatusDurations(); // Assuming getStatusDurations gives the correct durations
+
+      // Calculate duration from pending to preparing
+      if (statusDurations.pending && statusDurations.preparing) {
+        pendingToPreparingDurations.push(statusDurations.preparing);
+      }
+
+      // Calculate duration from preparing to completed
+      if (statusDurations.preparing && statusDurations.completed) {
+        preparingToCompletedDurations.push(statusDurations.completed);
+      }
+    });
+
+    // Helper function to calculate the average time (in minutes)
+    const calculateAverageTime = (durations) => {
+      if (durations.length === 0) return 0;
+      const totalDuration = durations.reduce(
+        (sum, duration) => sum + duration,
+        0
+      );
+      return Math.round(totalDuration / durations.length / 60000); // Convert milliseconds to minutes
+    };
+
+    // Calculate average times for both transitions
+    const avgPendingToPreparing = calculateAverageTime(
+      pendingToPreparingDurations
+    );
+    const avgPreparingToCompleted = calculateAverageTime(
+      preparingToCompletedDurations
+    );
+
+    res.status(200).json({
+      avgPendingToPreparing,
+      avgPreparingToCompleted,
+    });
+  } catch (error) {
+    console.error("Error calculating average processing time:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to calculate average processing time", error });
+  }
+};
 
 module.exports = {
   getDailyRevenue,
@@ -1107,4 +1170,5 @@ module.exports = {
   getWeeklyRevenue,
   getRevenueBetweenDates,
   getMonthlyGrowthRate,
+  getAverageProcessingTime,
 };

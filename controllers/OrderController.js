@@ -56,11 +56,15 @@ const createOrder = async (req, res) => {
     }
 
     const totalPrice = await calculateTotalPriceCreating(products);
+    console.log(totalPrice);
     const newOrder = new Order({
       products,
       table: table._id,
       totalPrice,
       user: userId,
+      statusTimestamps: {
+        pending: new Date(),
+      },
     });
 
     await newOrder.save();
@@ -545,19 +549,26 @@ const getOrdersBySuperClientIdFIFO = async (req, res) => {
     // Find orders that match the table IDs, sorted by timestamp (FIFO), excluding archived orders
     const orders = await Order.find({
       table: { $in: tableIds },
-      status: { $ne: "archived" }, // Exclude orders with status "archived"
+      status: { $ne: "archived" },
     })
-      .sort({ timestamp: 1 }) // Sort orders in FIFO order
+      .populate("products.product") // Populate the product details
       .populate("table") // Populate the table details
-      .populate("products.product"); // Populate product details within each order
+      .sort({ timestamp: 1 }); // Sorts orders by creation time in ascending order (FIFO)
 
-    // Return the filtered and sorted orders as a JSON response
-    res.status(200).json(orders);
+    // Add status durations for each order
+    const ordersWithDurations = orders.map((order) => {
+      const statusDurations = order.getStatusDurations();
+      console.log(statusDurations);
+      return {
+        ...order.toObject(),
+        statusDurations, // Include the status durations in the response
+      };
+    });
+
+    res.status(200).json(ordersWithDurations);
   } catch (error) {
-    // Handle any errors that occur during the process
-    res
-      .status(500)
-      .json({ message: "Failed to retrieve orders", error: error.message });
+    console.error("Error retrieving orders:", error);
+    res.status(500).json({ message: "Failed to retrieve orders", error });
   }
 };
 

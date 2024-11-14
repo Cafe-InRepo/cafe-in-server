@@ -44,7 +44,10 @@ router.get(
 // router.put("/:orderId/increase/:productId", increaseProductQuantity);
 // router.put("/:orderId/decrease/:productId", decreaseProductQuantity);
 router.put("/confirm/confirm-payment", verifyToken, confirmSelectedPayments);
-router.put("/confirm/confirm-products-payment", verifyToken, confirmSelectedProductsPayments);
-
+router.put(
+  "/confirm/confirm-products-payment",
+  verifyToken,
+  confirmSelectedProductsPayments
+);
 
 module.exports = router;
