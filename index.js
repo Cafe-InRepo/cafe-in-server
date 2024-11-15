@@ -20,6 +20,7 @@ const socketIo = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 
+const cors = require("cors");
 // Initialize socket.io with CORS settings
 const io = socketIo(server, {
   cors: {
@@ -29,7 +30,6 @@ const io = socketIo(server, {
 });
 
 // Enable CORS
-const cors = require("cors");
 app.use(
   cors({
     origin: "*", // Allow only this specific origin
