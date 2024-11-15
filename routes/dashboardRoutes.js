@@ -60,7 +60,7 @@ router.get(
 router.get("/most-sold-products", verifySuperClient, getMostSoldProducts);
 
 router.get("/revenue-year", verifySuperClient, getRevenueForCurrentYear);
-router.get("/average-processing-time", verifySuperClient, getAverageProcessingTime);
+router.post("/average-processing-time", verifySuperClient, getAverageProcessingTime);
 router.get("/revenue-csv", verifySuperClient, getRevenueExcel);
 router.get("/daily-receipt", verifyToken, getUserArchivedOrders);
 router.post("/close-daily", verifyToken, closeUserOrders);

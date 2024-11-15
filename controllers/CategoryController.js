@@ -76,6 +76,7 @@ const deleteCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
 
+    // Find the category by ID
     const category = await Category.findById(categoryId);
     if (!category) {
       return res.status(404).json({ error: "Category not found" });
@@ -84,8 +85,18 @@ const deleteCategory = async (req, res) => {
     // Remove all products in the category
     await Product.deleteMany({ _id: { $in: category.products } });
 
+    // Delete the category itself
     await Category.findByIdAndDelete(categoryId);
-    logger.info(`Category with ID ${categoryId} deleted successfully`);
+
+    // Update the Menu to remove the category ID from the categories array
+    await Menu.updateMany(
+      { categories: categoryId },
+      { $pull: { categories: categoryId } }
+    );
+
+    logger.info(
+      `Category with ID ${categoryId} deleted successfully and removed from associated menus`
+    );
     res.status(200).json({ message: "Category deleted successfully" });
   } catch (error) {
     logger.error(
