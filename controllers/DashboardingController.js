@@ -462,23 +462,17 @@ const getUserArchivedOrders = async (req, res) => {
       status: "archived",
       isClosed: false,
       user: userId, // Ensure the user matches the authenticated user
-    })
-      .populate("user", "fullName") // Populate 'user' to get fullName
-      .populate({
-        path: "products.product", // Populate the product details inside the order
-        model: "Product", // Reference to the Product model
-        select: "name price", // Include only the 'name' and 'price' fields for the products
-      });
+    }).populate("user", "fullName"); // Populate 'user' to get fullName
 
-    // Calculate total price for each order and format the product details
+    // Format product details directly from productDetails instead of populating
     const orderData = orders.map((order) => ({
       orderId: order._id,
       products: order.products.map((productEntry) => ({
-        productId: productEntry.product,
-        productName: productEntry.name,
-        productPrice: productEntry.price,
+        productId: productEntry.productDetails._id,
+        productName: productEntry.productDetails.name,
+        productPrice: productEntry.productDetails.price,
         quantity: productEntry.quantity,
-        totalPrice: productEntry.quantity * productEntry.price, // Calculate total for each product
+        totalPrice: productEntry.quantity * productEntry.productDetails.price, // Calculate total for each product
       })),
       totalPrice: order.totalPrice, // The total price of the entire order
       timestamp: order.timestamp, // Timestamp when the order was placed
@@ -516,7 +510,7 @@ const closeUserOrders = async (req, res) => {
       user: userId, // Match the current user's orders
       isClosed: false, // Only find orders where isClosed is false
       status: "archived", // Ensure the orders are archived
-    }).populate("products.product"); // Populate the product details
+    });
 
     // If no matching orders are found, return a 404 response
     if (ordersToClose.length === 0) {
@@ -524,6 +518,17 @@ const closeUserOrders = async (req, res) => {
         message: "No open archived orders found for the current user.",
       });
     }
+
+    // Transform the orders to include product details instead of populating
+    const ordersWithProductDetails = ordersToClose.map((order) => {
+      const productsWithDetails = order.products.map((product) => ({
+        name: product.productDetails.name,
+        quantity: product.quantity,
+        price: product.productDetails.price,
+        total: product.quantity * product.productDetails.price,
+      }));
+      return { ...order.toObject(), products: productsWithDetails };
+    });
 
     // Perform the update to set isClosed to true
     await Order.updateMany(
@@ -535,10 +540,10 @@ const closeUserOrders = async (req, res) => {
       }
     );
 
-    // Return the modified orders with populated products
+    // Return the modified orders with product details
     res.status(200).json({
       message: "All matching orders have been successfully closed.",
-      closedOrders: ordersToClose, // Return the orders that were closed with product details
+      closedOrders: ordersWithProductDetails, // Return the orders that were closed with product details
     });
   } catch (error) {
     res.status(500).json({
@@ -552,32 +557,37 @@ const getRevenueByProduct = async (req, res) => {
   const superClientId = req.superClientId;
 
   try {
+    // Find orders with 'archived' status
     const orders = await Order.find({
       status: "archived",
-    })
-      .populate("table") // Populate the table
-      .populate("products.product") // Populate the products
-      .then((orders) => {
-        return orders.filter((order) =>
-          order.table.superClient.equals(superClientId)
-        );
-      });
+    }).populate("table"); // Populate the table only
 
-    const revenue = orders.reduce((result, order) => {
-      order.products.forEach((product) => {
-        const productId = product.product._id.toString();
-        if (!result[productId]) {
-          result[productId] = {
-            productName: product.product.name,
-            totalRevenue: 0,
-          };
+    // Filter orders to include only those related to the current super client
+    const filteredOrders = orders.filter((order) =>
+      order.table.superClient.equals(superClientId)
+    );
+
+    // Calculate revenue using the productDetails field directly
+    const revenue = filteredOrders.reduce((result, order) => {
+      order.products.forEach((productEntry) => {
+        const { productDetails, quantity } = productEntry;
+
+        // Ensure productDetails exists (in case products were deleted)
+        if (productDetails) {
+          const productId = productDetails._id.toString();
+          if (!result[productId]) {
+            result[productId] = {
+              productName: productDetails.name,
+              totalRevenue: 0,
+            };
+          }
+          result[productId].totalRevenue += quantity * productDetails.price;
         }
-        result[productId].totalRevenue +=
-          product.quantity * product.product.price;
       });
       return result;
     }, {});
 
+    // Format the revenue data for response
     const formattedRevenue = Object.entries(revenue).map(
       ([productId, details]) => ({
         _id: productId,
@@ -594,6 +604,7 @@ const getRevenueByProduct = async (req, res) => {
     });
   }
 };
+
 const getRevenueByProductByMonth = async (req, res) => {
   const superClientId = req.superClientId;
 
@@ -610,31 +621,34 @@ const getRevenueByProductByMonth = async (req, res) => {
         $gte: new Date(`${currentYear}-01-01T00:00:00Z`),
         $lt: new Date(`${currentYear + 1}-01-01T00:00:00Z`),
       },
-    })
-      .populate("table") // Populate the table
-      .populate("products.product") // Populate the products
-      .then((orders) => {
-        return orders.filter((order) =>
-          order.table.superClient.equals(superClientId)
-        );
-      });
+    }).populate("table"); // Populate the table only
+
+    // Filter orders to include only those related to the current super client
+    const filteredOrders = orders.filter((order) =>
+      order.table.superClient.equals(superClientId)
+    );
 
     // Group revenue by product and month
-    const revenue = orders.reduce((result, order) => {
+    const revenue = filteredOrders.reduce((result, order) => {
       const month = new Date(order.timestamp).getMonth() + 1; // Get month from timestamp
       if (month > currentMonth) return result; // Skip future months
 
-      order.products.forEach((product) => {
-        const productId = product.product._id.toString();
-        if (!result[month]) result[month] = {};
-        if (!result[month][productId]) {
-          result[month][productId] = {
-            productName: product.product.name,
-            totalRevenue: 0,
-          };
+      order.products.forEach((productEntry) => {
+        const { productDetails, quantity } = productEntry;
+
+        // Ensure productDetails exists (in case products were deleted)
+        if (productDetails) {
+          const productId = productDetails._id.toString();
+          if (!result[month]) result[month] = {};
+          if (!result[month][productId]) {
+            result[month][productId] = {
+              productName: productDetails.name,
+              totalRevenue: 0,
+            };
+          }
+          result[month][productId].totalRevenue +=
+            quantity * productDetails.price;
         }
-        result[month][productId].totalRevenue +=
-          product.quantity * product.product.price;
       });
       return result;
     }, {});
@@ -664,31 +678,37 @@ const getMostSoldProducts = async (req, res) => {
   const superClientId = req.superClientId;
 
   try {
+    // Find orders with 'archived' status
     const orders = await Order.find({
       status: "archived",
-    })
-      .populate("table") // Populate the table
-      .populate("products.product") // Populate the products
-      .then((orders) => {
-        return orders.filter((order) =>
-          order.table.superClient.equals(superClientId)
-        );
-      });
+    }).populate("table"); // Populate the table only
 
-    const products = orders.reduce((result, order) => {
-      order.products.forEach((product) => {
-        const productId = product.product._id.toString();
-        if (!result[productId]) {
-          result[productId] = {
-            productName: product.product.name,
-            totalSold: 0,
-          };
+    // Filter orders to include only those related to the current super client
+    const filteredOrders = orders.filter((order) =>
+      order.table.superClient.equals(superClientId)
+    );
+
+    // Calculate the total quantity sold using the productDetails field directly
+    const products = filteredOrders.reduce((result, order) => {
+      order.products.forEach((productEntry) => {
+        const { productDetails, quantity } = productEntry;
+
+        // Ensure productDetails exists (in case products were deleted)
+        if (productDetails) {
+          const productId = productDetails._id.toString();
+          if (!result[productId]) {
+            result[productId] = {
+              productName: productDetails.name,
+              totalSold: 0,
+            };
+          }
+          result[productId].totalSold += quantity;
         }
-        result[productId].totalSold += product.quantity;
       });
       return result;
     }, {});
 
+    // Format the product data for response
     const formattedProducts = Object.entries(products)
       .map(([productId, details]) => ({
         _id: productId,
@@ -773,30 +793,34 @@ const getRevenueByProductBetweenDates = async (req, res) => {
     const orders = await Order.find({
       status: "archived",
       timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) },
-    })
-      .populate("table") // Populate the table
-      .populate("products.product") // Populate the products
-      .then((orders) => {
-        return orders.filter((order) =>
-          order.table.superClient.equals(superClientId)
-        );
-      });
+    }).populate("table"); // Populate the table only
 
-    const revenue = orders.reduce((result, order) => {
-      order.products.forEach((product) => {
-        const productId = product.product._id.toString();
-        if (!result[productId]) {
-          result[productId] = {
-            productName: product.product.name,
-            totalRevenue: 0,
-          };
+    // Filter orders to include only those related to the current super client
+    const filteredOrders = orders.filter((order) =>
+      order.table.superClient.equals(superClientId)
+    );
+
+    // Calculate revenue using the productDetails field directly
+    const revenue = filteredOrders.reduce((result, order) => {
+      order.products.forEach((productEntry) => {
+        const { productDetails, quantity } = productEntry;
+
+        // Ensure productDetails exists (in case products were deleted)
+        if (productDetails) {
+          const productId = productDetails._id.toString();
+          if (!result[productId]) {
+            result[productId] = {
+              productName: productDetails.name,
+              totalRevenue: 0,
+            };
+          }
+          result[productId].totalRevenue += quantity * productDetails.price;
         }
-        result[productId].totalRevenue +=
-          product.quantity * product.product.price;
       });
       return result;
     }, {});
 
+    // Format the revenue data for response
     const formattedRevenue = Object.entries(revenue).map(
       ([productId, details]) => ({
         _id: productId,
@@ -813,6 +837,7 @@ const getRevenueByProductBetweenDates = async (req, res) => {
     });
   }
 };
+
 const getMonthlyRevenueForSpecificMonth = async (req, res) => {
   const { superClientId } = req;
   const { month, year } = req.body;
@@ -1039,7 +1064,6 @@ const getRevenueByProductForCurrentWeek = async (req, res) => {
       },
     })
       .populate("table")
-      .populate("products.product")
       .then((orders) =>
         orders.filter((order) => order.table.superClient.equals(superClientId))
       );
@@ -1056,15 +1080,18 @@ const getRevenueByProductForCurrentWeek = async (req, res) => {
       const day = new Date(order.timestamp).toISOString().split("T")[0];
       if (dailyProductRevenue[day]) {
         order.products.forEach((product) => {
-          const productId = product.product._id.toString();
-          if (!dailyProductRevenue[day][productId]) {
-            dailyProductRevenue[day][productId] = {
-              productName: product.product.name,
-              totalRevenue: 0,
-            };
+          const { productDetails, quantity } = product;
+          if (productDetails) {
+            const productId = productDetails._id.toString();
+            if (!dailyProductRevenue[day][productId]) {
+              dailyProductRevenue[day][productId] = {
+                productName: productDetails.name,
+                totalRevenue: 0,
+              };
+            }
+            dailyProductRevenue[day][productId].totalRevenue +=
+              quantity * productDetails.price;
           }
-          dailyProductRevenue[day][productId].totalRevenue +=
-            product.quantity * product.product.price;
         });
       }
     });
@@ -1088,6 +1115,7 @@ const getRevenueByProductForCurrentWeek = async (req, res) => {
     });
   }
 };
+
 const getAverageProcessingTime = async (req, res) => {
   const { startDate, endDate } = req.body;
 

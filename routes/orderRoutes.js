@@ -34,7 +34,7 @@ router.delete("/:orderId", deleteOrder);
 
 router.get("/:orderId", getOrder);
 router.get("/", decodeTableToken, getAllOrders);
-router.get("/client", getAllOrders);
+//router.get("/client", getAllOrders);
 router.get(
   "/orders/ordersfifo",
   verifyClientOrSuperClient,

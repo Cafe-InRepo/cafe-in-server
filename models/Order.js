@@ -9,6 +9,11 @@ const orderSchema = new Schema({
         ref: "Product",
         required: true,
       },
+      productDetails: {
+        // Embedded product details for deleted products
+        name: { type: String },
+        price: { type: Number },
+      },
       quantity: {
         type: Number,
         required: true,
@@ -99,6 +104,24 @@ orderSchema.methods.getStatusDurations = function () {
 
   return durations; // returns durations in milliseconds
 };
+
+// set products details for recuperation in case of delete
+orderSchema.pre("save", async function (next) {
+  if (this.isModified("products")) {
+    for (let i = 0; i < this.products.length; i++) {
+      const product = await mongoose
+        .model("Product")
+        .findById(this.products[i].product);
+      if (product) {
+        this.products[i].productDetails = {
+          name: product.name,
+          price: product.price,
+        };
+      }
+    }
+  }
+  next();
+});
 
 const Order = mongoose.model("Order", orderSchema);
 module.exports = Order;
