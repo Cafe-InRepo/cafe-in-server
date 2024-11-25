@@ -107,13 +107,11 @@ const updateProduct = async (req, res) => {
       const allowedFormats = ["jpg", "jpeg", "png"];
       const matches = img.match(/^data:image\/(png|jpe?g);base64,/);
       if (!matches || !allowedFormats.includes(matches[1])) {
-        return res
-          .status(400)
-          .json({
-            error: `Invalid image format. Only ${allowedFormats.join(
-              ", "
-            )} formats are allowed.`,
-          });
+        return res.status(400).json({
+          error: `Invalid image format. Only ${allowedFormats.join(
+            ", "
+          )} formats are allowed.`,
+        });
       }
 
       // Upload the new image to Cloudinary
@@ -187,10 +185,13 @@ const getMenuProducts = async (req, res) => {
 
     // Find the menu for the given userId and populate categories and their products
     const menu = await Menu.findOne({ user: userId }).populate({
-      path: "categories",
+      path: "sections",
       populate: {
-        path: "products",
-        model: "Product",
+        path: "categories",
+        populate: {
+          path: "products",
+          model: "Product",
+        },
       },
     });
 
@@ -199,7 +200,9 @@ const getMenuProducts = async (req, res) => {
     }
 
     // Extract all products from the populated categories
-    const products = menu.categories.flatMap((category) => category.products);
+    const products = menu.sections.flatMap((section) =>
+      section.categories.flatMap((category) => category.products)
+    );
 
     return res.status(200).json(products);
   } catch (err) {
@@ -247,10 +250,13 @@ const getProductRatingsBySuperClient = async (req, res) => {
   try {
     // Find the menu for the given superClient
     const menu = await Menu.findOne({ user: superClientId }).populate({
-      path: "categories",
+      path: "sections",
       populate: {
-        path: "products",
-        model: "Product",
+        path: "categories",
+        populate: {
+          path: "products",
+          model: "Product",
+        },
       },
     });
 
@@ -262,14 +268,16 @@ const getProductRatingsBySuperClient = async (req, res) => {
 
     // Extract product ratings from the menu
     const productRatings = [];
-    menu.categories.forEach((category) => {
-      category.products.forEach((product) => {
-        productRatings.push({
-          productId: product._id,
-          productName: product.name,
-          rate: product.rate,
-          raters: product.raters,
-          price: product.price,
+    menu.sections.forEach((section) => {
+      section.categories.forEach((category) => {
+        category.products.forEach((product) => {
+          productRatings.push({
+            productId: product._id,
+            productName: product.name,
+            rate: product.rate,
+            raters: product.raters,
+            price: product.price,
+          });
         });
       });
     });

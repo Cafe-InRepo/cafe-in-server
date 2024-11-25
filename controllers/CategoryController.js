@@ -1,32 +1,30 @@
 const Category = require("../models/Category");
-const Product = require("../models/Product");
+const Section = require("../models/Section");
 const logger = require("../logger");
-const Menu = require("../models/Menu");
+const Product = require("../models/Product");
 
 const createCategory = async (req, res) => {
   try {
-    const { name } = req.body;
-    const superClientId = req.superClientId;
+    const { name, sectionId } = req.body;
+
+    // Find the section associated with the sectionId
+    const section = await Section.findById(sectionId);
+    if (!section) {
+      return res.status(404).json({ error: "Section not found" });
+    }
 
     // Create a new category
     const newCategory = new Category({ name });
     await newCategory.save();
 
-    // Find the menu associated with the superClientId
-    const menu = await Menu.findOne({ user: superClientId });
+    // Add the new category to the section
+    section.categories.push(newCategory._id);
+    await section.save();
 
-    if (!menu) {
-      return res.status(404).json({ error: "Menu not found" });
-    }
-
-    // Add the new category to the menu
-    menu.categories.push(newCategory._id);
-    await menu.save();
-
-    logger.info(`Category ${name} created and added to menu successfully`);
+    logger.info(`Category ${name} created and added to section successfully`);
 
     res.status(201).json({
-      message: "Category created and added to menu successfully",
+      message: "Category created and added to section successfully",
       category: newCategory,
     });
   } catch (error) {
@@ -82,20 +80,20 @@ const deleteCategory = async (req, res) => {
       return res.status(404).json({ error: "Category not found" });
     }
 
-    // Remove all products in the category
+    // Find and update the section to remove the category reference
+    await Section.updateMany(
+      { categories: categoryId },
+      { $pull: { categories: categoryId } }
+    );
+
+    // Delete all products in the category
     await Product.deleteMany({ _id: { $in: category.products } });
 
     // Delete the category itself
     await Category.findByIdAndDelete(categoryId);
 
-    // Update the Menu to remove the category ID from the categories array
-    await Menu.updateMany(
-      { categories: categoryId },
-      { $pull: { categories: categoryId } }
-    );
-
     logger.info(
-      `Category with ID ${categoryId} deleted successfully and removed from associated menus`
+      `Category with ID ${categoryId} deleted successfully and removed from associated sections`
     );
     res.status(200).json({ message: "Category deleted successfully" });
   } catch (error) {

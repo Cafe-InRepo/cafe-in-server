@@ -11,6 +11,11 @@ const orderSchema = new Schema({
       },
       productDetails: {
         // Embedded product details for deleted products
+        _id: {
+          type: Schema.Types.ObjectId,
+          ref: "Product",
+          required: false,
+        },
         name: { type: String },
         price: { type: Number },
       },
@@ -114,6 +119,7 @@ orderSchema.pre("save", async function (next) {
         .findById(this.products[i].product);
       if (product) {
         this.products[i].productDetails = {
+          _id: product._id,
           name: product.name,
           price: product.price,
         };

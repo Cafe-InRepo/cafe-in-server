@@ -1,11 +1,9 @@
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
-const Category = require("./Category");
+const Section = require("./Section");
 
 const menuSchema = new Schema({
-  categories: [
-    { type: Schema.Types.ObjectId, ref: "Category", required: true },
-  ],
+  sections: [{ type: Schema.Types.ObjectId, ref: "Section", required: true }],
   user: {
     type: Schema.Types.ObjectId,
     ref: "User",

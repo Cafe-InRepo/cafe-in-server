@@ -24,7 +24,7 @@ router.post("/manual", verifyClientOrSuperClient, createOrder);
 
 router.post("/:orderId/rate", rateOrderProducts);
 router.put("/:orderId", updateOrder);
-router.put(
+router.patch(
   "/update-status/:orderId",
   verifyClientOrSuperClient,
   updateOrderStatus

@@ -5,11 +5,11 @@ const createMenu = (req, res) => {
   Menu.findOne({ user: req.userId })
     .then((existingMenu) => {
       if (existingMenu) {
-        return res.status(400).json({ error: "Client already has a menu" });
+        return res.status(400).json({ error: "User already has a menu" });
       }
 
       const newMenu = new Menu({
-        categories: req.body.categories,
+        sections: req.body.sections, // Expecting an array of section IDs in the request
         user: req.userId,
       });
 
@@ -23,14 +23,17 @@ const createMenu = (req, res) => {
 
 // Get the menu for the authenticated user
 const getMenu = (req, res) => {
-  //each superClient has only one menu
+  // Each superClient has only one menu
   const superClientId = req.superClientId;
   Menu.findOne({ user: superClientId })
     .populate({
-      path: "categories",
+      path: "sections",
       populate: {
-        path: "products",
-        model: "Product",
+        path: "categories",
+        populate: {
+          path: "products",
+          model: "Product",
+        },
       },
     })
     .then((menu) => {

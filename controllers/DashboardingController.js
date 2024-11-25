@@ -574,7 +574,7 @@ const getRevenueByProduct = async (req, res) => {
 
         // Ensure productDetails exists (in case products were deleted)
         if (productDetails) {
-          const productId = productDetails._id.toString();
+          const productId = productDetails._id;
           if (!result[productId]) {
             result[productId] = {
               productName: productDetails.name,
@@ -638,7 +638,7 @@ const getRevenueByProductByMonth = async (req, res) => {
 
         // Ensure productDetails exists (in case products were deleted)
         if (productDetails) {
-          const productId = productDetails._id.toString();
+          const productId = productDetails._id;
           if (!result[month]) result[month] = {};
           if (!result[month][productId]) {
             result[month][productId] = {
@@ -695,7 +695,7 @@ const getMostSoldProducts = async (req, res) => {
 
         // Ensure productDetails exists (in case products were deleted)
         if (productDetails) {
-          const productId = productDetails._id.toString();
+          const productId = productDetails._id;
           if (!result[productId]) {
             result[productId] = {
               productName: productDetails.name,
@@ -807,7 +807,7 @@ const getRevenueByProductBetweenDates = async (req, res) => {
 
         // Ensure productDetails exists (in case products were deleted)
         if (productDetails) {
-          const productId = productDetails._id.toString();
+          const productId = productDetails._id;
           if (!result[productId]) {
             result[productId] = {
               productName: productDetails.name,
@@ -1082,7 +1082,7 @@ const getRevenueByProductForCurrentWeek = async (req, res) => {
         order.products.forEach((product) => {
           const { productDetails, quantity } = product;
           if (productDetails) {
-            const productId = productDetails._id.toString();
+            const productId = productDetails._id;
             if (!dailyProductRevenue[day][productId]) {
               dailyProductRevenue[day][productId] = {
                 productName: productDetails.name,
