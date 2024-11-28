@@ -62,7 +62,6 @@ const orderSchema = new Schema({
     type: Boolean,
     default: false,
   },
-  //isClosed is used to get the receipit non-closed orders
   isClosed: {
     type: Boolean,
     default: false,
@@ -72,7 +71,13 @@ const orderSchema = new Schema({
     ref: "User",
     required: false,
   },
+  superClientId: {
+    type: Schema.Types.ObjectId,
+    ref: "User", // Reference to User model for superClient
+    required: false,
+  },
 });
+
 // the trigger is used to calculate each time the order spent in each status
 orderSchema.pre("save", function (next) {
   if (this.isModified("status")) {

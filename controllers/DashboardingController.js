@@ -20,19 +20,15 @@ const getDailyRevenue = async (req, res) => {
       });
     }
 
+    // Find orders with 'archived' status and within today's date, and filter by superClientId directly
     const revenue = await Order.find({
       status: "archived",
       timestamp: { $gte: startOfDay },
-    })
-      .populate("table") // Populate the table
-      .then((orders) => {
-        return orders.filter((order) =>
-          order.table.superClient.equals(superClientId)
-        );
-      })
-      .then((filteredOrders) => {
-        return filteredOrders.reduce((sum, order) => sum + order.totalPrice, 0);
-      });
+      superClientId, // Filter by superClientId directly
+    }).then((orders) => {
+      // Calculate total revenue by summing the totalPrice of all orders
+      return orders.reduce((sum, order) => sum + order.totalPrice, 0);
+    });
 
     res.status(200).json({ totalRevenue: revenue || 0 });
   } catch (error) {
@@ -44,6 +40,7 @@ const getDailyRevenue = async (req, res) => {
     });
   }
 };
+
 //get revenues for current month
 const getMonthlyRevenue = async (req, res) => {
   const superClientId = req.superClientId;
@@ -63,16 +60,15 @@ const getMonthlyRevenue = async (req, res) => {
       1
     );
 
+    // Find orders with 'archived' status and within the current month, filtered by superClientId
     const orders = await Order.find({
       status: "archived",
       timestamp: { $gte: startOfMonth },
-    }).populate("table");
+      superClientId, // Directly filter by superClientId
+    });
 
-    const filteredOrders = orders.filter((order) =>
-      order.table.superClient.equals(superClientId)
-    );
-
-    const revenue = filteredOrders.reduce((result, order) => {
+    // Calculate the daily revenue by summing the totalPrice for each day
+    const revenue = orders.reduce((result, order) => {
       const day = order.timestamp.getDate();
       if (!result[day]) {
         result[day] = 0;
@@ -81,6 +77,7 @@ const getMonthlyRevenue = async (req, res) => {
       return result;
     }, {});
 
+    // Format the daily revenue for response
     const formattedRevenue = Object.entries(revenue).map(([day, total]) => ({
       _id: { day: parseInt(day) },
       dailyRevenue: total,
@@ -95,6 +92,7 @@ const getMonthlyRevenue = async (req, res) => {
     });
   }
 };
+
 // growth current & previous month
 const getMonthlyGrowthRate = async (req, res) => {
   const superClientId = req.superClientId;
@@ -125,36 +123,28 @@ const getMonthlyGrowthRate = async (req, res) => {
       0
     ); // Last day of the previous month
 
-    // Fetch orders for the current month
+    // Fetch orders for the current month and filter by superClientId
     const currentMonthOrders = await Order.find({
       status: "archived",
       timestamp: { $gte: startOfCurrentMonth },
-    }).populate("table");
-
-    // Filter by superClientId for the current month
-    const currentMonthFilteredOrders = currentMonthOrders.filter((order) =>
-      order.table.superClient.equals(superClientId)
-    );
+      superClientId, // Directly filter by superClientId
+    });
 
     // Calculate current month revenue
-    const currentMonthRevenue = currentMonthFilteredOrders.reduce(
+    const currentMonthRevenue = currentMonthOrders.reduce(
       (total, order) => total + order.totalPrice,
       0
     );
 
-    // Fetch orders for the previous month
+    // Fetch orders for the previous month and filter by superClientId
     const previousMonthOrders = await Order.find({
       status: "archived",
       timestamp: { $gte: startOfPreviousMonth, $lte: endOfPreviousMonth },
-    }).populate("table");
-
-    // Filter by superClientId for the previous month
-    const previousMonthFilteredOrders = previousMonthOrders.filter((order) =>
-      order.table.superClient.equals(superClientId)
-    );
+      superClientId, // Directly filter by superClientId
+    });
 
     // Calculate previous month revenue
-    const previousMonthRevenue = previousMonthFilteredOrders.reduce(
+    const previousMonthRevenue = previousMonthOrders.reduce(
       (total, order) => total + order.totalPrice,
       0
     );
@@ -196,61 +186,44 @@ const getWeeklyRevenue = async (req, res) => {
   }
 
   try {
-    // Get the current date and set the time to the start of today
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of the current day
+    today.setHours(0, 0, 0, 0); // Start of today
 
     // Calculate the start date for the current week (6 days before today)
     const startDate = new Date(today);
-    startDate.setDate(today.getDate() - 6); // 6 days before today
+    startDate.setDate(today.getDate() - 6);
 
     // Set the end date to the end of today for the current week
     const endDate = new Date(today);
-    endDate.setHours(23, 59, 59, 999); // End of the current day
+    endDate.setHours(23, 59, 59, 999);
 
     // Calculate the previous week's start and end date
     const prevStartDate = new Date(startDate);
-    prevStartDate.setDate(startDate.getDate() - 7); // Previous week's start
+    prevStartDate.setDate(startDate.getDate() - 7);
 
     const prevEndDate = new Date(startDate);
-    prevEndDate.setHours(23, 59, 59, 999); // Previous week's end
+    prevEndDate.setHours(23, 59, 59, 999);
 
-    // Fetch current week's orders
-    const currentWeekOrders = await Order.find({
-      status: "archived",
-      timestamp: { $gte: startDate, $lte: endDate },
-    })
-      .populate({
-        path: "table",
-        match: { superClient: superClientId },
-      })
-      .exec();
-
-    // Fetch previous week's orders
-    const prevWeekOrders = await Order.find({
-      status: "archived",
-      timestamp: { $gte: prevStartDate, $lte: prevEndDate },
-    })
-      .populate({
-        path: "table",
-        match: { superClient: superClientId },
-      })
-      .exec();
-
-    // Filter orders that do not have a matching superClient
-    const filteredCurrentWeekOrders = currentWeekOrders.filter(
-      (order) => order.table !== null
-    );
-    const filteredPrevWeekOrders = prevWeekOrders.filter(
-      (order) => order.table !== null
-    );
+    // Fetch orders for current week and previous week, filtered by superClientId
+    const [currentWeekOrders, prevWeekOrders] = await Promise.all([
+      Order.find({
+        status: "archived",
+        timestamp: { $gte: startDate, $lte: endDate },
+        superClientId, // Directly filter by superClientId
+      }),
+      Order.find({
+        status: "archived",
+        timestamp: { $gte: prevStartDate, $lte: prevEndDate },
+        superClientId, // Directly filter by superClientId
+      }),
+    ]);
 
     // Calculate total revenue for current and previous week
-    const currentWeekRevenue = filteredCurrentWeekOrders.reduce(
+    const currentWeekRevenue = currentWeekOrders.reduce(
       (total, order) => total + order.totalPrice,
       0
     );
-    const prevWeekRevenue = filteredPrevWeekOrders.reduce(
+    const prevWeekRevenue = prevWeekOrders.reduce(
       (total, order) => total + order.totalPrice,
       0
     );
@@ -262,7 +235,7 @@ const getWeeklyRevenue = async (req, res) => {
         : 0;
 
     // Calculate daily revenue for each day in the current week
-    const dailyRevenue = filteredCurrentWeekOrders.reduce((result, order) => {
+    const dailyRevenue = currentWeekOrders.reduce((result, order) => {
       const day = order.timestamp.getDate();
       if (!result[day]) {
         result[day] = 0;
@@ -309,7 +282,8 @@ const getRevenueBetweenDates = async (req, res) => {
 
   // If no startDate or endDate is provided, set them to today and 14 days before
   const currentDate = new Date();
-  const defaultEndDate = new Date(currentDate.setHours(23, 59, 59, 999)); // End of today
+  const defaultEndDate = new Date(currentDate); // End of today
+  defaultEndDate.setHours(23, 59, 59, 999); // End of today
   const defaultStartDate = new Date();
   defaultStartDate.setDate(defaultStartDate.getDate() - 14); // 14 days before today
   defaultStartDate.setHours(0, 0, 0, 0); // Start of the day 14 days ago
@@ -324,23 +298,22 @@ const getRevenueBetweenDates = async (req, res) => {
   }
 
   try {
+    // Fetch orders within the date range for the superClient
     const orders = await Order.find({
       status: "archived",
       timestamp: { $gte: start, $lte: end },
-    }).populate("table");
-
-    const filteredOrders = orders.filter((order) =>
-      order.table.superClient.equals(superClientId)
-    );
+      superClientId, // Filter by superClientId directly in the query
+    });
 
     // If no orders found, return an appropriate response
-    if (filteredOrders.length === 0) {
+    if (orders.length === 0) {
       return res
-        .status(200)
+        .status(404)
         .json({ message: "No revenue found for the given date range." });
     }
 
-    const revenue = filteredOrders.reduce((result, order) => {
+    // Calculate the revenue for each day
+    const revenue = orders.reduce((result, order) => {
       const year = order.timestamp.getFullYear();
       const month = order.timestamp.getMonth() + 1; // Months are zero-indexed in JS, so add 1
       const day = order.timestamp.getDate();
@@ -366,6 +339,7 @@ const getRevenueBetweenDates = async (req, res) => {
       };
     });
 
+    // Return the formatted revenue
     res.status(200).json(formattedRevenue);
   } catch (error) {
     console.error("Error retrieving revenue between dates:", error);
@@ -377,33 +351,18 @@ const getRevenueBetweenDates = async (req, res) => {
 };
 
 const getRevenueByClient = async (req, res) => {
-  const superClientId = req.superClientId; // Assuming you get this from authentication
+  const superClientId = req.superClientId; // Assuming this comes from authentication
 
   try {
-    // Find orders with 'archived' status and populate 'table' and 'user' (for client details)
+    // Find orders with 'archived' status and matching superClientId
     const orders = await Order.find({
       status: "archived",
-    })
-      .populate({
-        path: "table", // Populate the 'table' field
-        populate: {
-          path: "superClient", // Populate the 'superClient' within the table
-          model: "User", // SuperClient refers to the 'User' model
-        },
-      })
-      .populate("user", "fullName") // Populate 'user' field and select 'fullName'
-      .then((orders) => {
-        // Filter orders by superClient, making sure it's populated
-        return orders.filter(
-          (order) =>
-            order.table.superClient &&
-            order.table.superClient._id.equals(superClientId)
-        );
-      });
+      superClientId, // Directly filter by superClientId
+    }).populate("user", "fullName"); // Populate 'user' field and select 'fullName'
 
     // Calculate revenue by client
     const revenue = orders.reduce((result, order) => {
-      const clientId = order.user;
+      const clientId = order.user?._id;
       const clientName = order.user?.fullName;
       const orderDate = new Date(order.timestamp);
       const year = orderDate.getFullYear();
@@ -452,6 +411,7 @@ const getRevenueByClient = async (req, res) => {
     });
   }
 };
+
 const getUserArchivedOrders = async (req, res) => {
   const userId = req.userId; // Use the authenticated user's ID
   console.log(userId);
@@ -557,18 +517,14 @@ const getRevenueByProduct = async (req, res) => {
   const superClientId = req.superClientId;
 
   try {
-    // Find orders with 'archived' status
+    // Fetch orders using 'status' and 'superClientId' directly in the query
     const orders = await Order.find({
       status: "archived",
-    }).populate("table"); // Populate the table only
-
-    // Filter orders to include only those related to the current super client
-    const filteredOrders = orders.filter((order) =>
-      order.table.superClient.equals(superClientId)
-    );
+      superClientId: superClientId, // Filter by superClientId directly
+    });
 
     // Calculate revenue using the productDetails field directly
-    const revenue = filteredOrders.reduce((result, order) => {
+    const revenue = orders.reduce((result, order) => {
       order.products.forEach((productEntry) => {
         const { productDetails, quantity } = productEntry;
 
@@ -614,22 +570,18 @@ const getRevenueByProductByMonth = async (req, res) => {
     const now = new Date();
     const currentMonth = now.getMonth() + 1; // JavaScript months are 0-based
 
-    // Find orders from the current year
+    // Find orders from the current year, without the unnecessary table population
     const orders = await Order.find({
       status: "archived",
       timestamp: {
         $gte: new Date(`${currentYear}-01-01T00:00:00Z`),
         $lt: new Date(`${currentYear + 1}-01-01T00:00:00Z`),
       },
-    }).populate("table"); // Populate the table only
-
-    // Filter orders to include only those related to the current super client
-    const filteredOrders = orders.filter((order) =>
-      order.table.superClient.equals(superClientId)
-    );
+      superClientId: superClientId, // Directly filter by superClientId
+    });
 
     // Group revenue by product and month
-    const revenue = filteredOrders.reduce((result, order) => {
+    const revenue = orders.reduce((result, order) => {
       const month = new Date(order.timestamp).getMonth() + 1; // Get month from timestamp
       if (month > currentMonth) return result; // Skip future months
 
@@ -678,18 +630,14 @@ const getMostSoldProducts = async (req, res) => {
   const superClientId = req.superClientId;
 
   try {
-    // Find orders with 'archived' status
+    // Find orders with 'archived' status and filter by superClientId directly
     const orders = await Order.find({
       status: "archived",
-    }).populate("table"); // Populate the table only
-
-    // Filter orders to include only those related to the current super client
-    const filteredOrders = orders.filter((order) =>
-      order.table.superClient.equals(superClientId)
-    );
+      superClientId: superClientId, // Filter by superClientId directly in the query
+    });
 
     // Calculate the total quantity sold using the productDetails field directly
-    const products = filteredOrders.reduce((result, order) => {
+    const products = orders.reduce((result, order) => {
       order.products.forEach((productEntry) => {
         const { productDetails, quantity } = productEntry;
 
@@ -743,19 +691,16 @@ const getOrdersByMonthForYear = async (req, res) => {
     const startOfYear = new Date(new Date().getFullYear(), 0, 1);
     const endOfYear = new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
 
+    // Fetch orders with filtering by status and superClientId directly in the query
     const orders = await Order.find({
       status: "archived",
+      superClientId: superClientId, // Directly filter by superClientId
       timestamp: { $gte: startOfYear, $lte: endOfYear },
-    })
-      .populate("table") // Populate the table
-      .then((orders) => {
-        return orders.filter((order) =>
-          order.table.superClient.equals(superClientId)
-        );
-      });
+    });
 
+    // Group orders by month
     const ordersByMonth = orders.reduce((result, order) => {
-      const month = order.timestamp.getMonth() + 1;
+      const month = order.timestamp.getMonth() + 1; // Get the month (1-12)
       if (!result[month]) {
         result[month] = [];
       }
@@ -763,6 +708,7 @@ const getOrdersByMonthForYear = async (req, res) => {
       return result;
     }, {});
 
+    // Format the orders by month for the response
     const formattedOrders = Object.entries(ordersByMonth).map(
       ([month, orders]) => ({
         _id: { month: parseInt(month) },
@@ -779,6 +725,7 @@ const getOrdersByMonthForYear = async (req, res) => {
     });
   }
 };
+
 const getRevenueByProductBetweenDates = async (req, res) => {
   const superClientId = req.superClientId;
   const { startDate, endDate } = req.body;
@@ -790,18 +737,15 @@ const getRevenueByProductBetweenDates = async (req, res) => {
   }
 
   try {
+    // Fetch orders between startDate and endDate for the specific superClientId
     const orders = await Order.find({
       status: "archived",
+      superClientId: superClientId, // Filter by superClientId directly in the query
       timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) },
-    }).populate("table"); // Populate the table only
-
-    // Filter orders to include only those related to the current super client
-    const filteredOrders = orders.filter((order) =>
-      order.table.superClient.equals(superClientId)
-    );
+    });
 
     // Calculate revenue using the productDetails field directly
-    const revenue = filteredOrders.reduce((result, order) => {
+    const revenue = orders.reduce((result, order) => {
       order.products.forEach((productEntry) => {
         const { productDetails, quantity } = productEntry;
 
@@ -864,16 +808,15 @@ const getMonthlyRevenueForSpecificMonth = async (req, res) => {
     const startOfMonth = new Date(year, month - 1, 1);
     const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999); // last day of the month
 
+    // Query orders for the given month and year, filtering by superClientId
     const orders = await Order.find({
       status: "archived",
+      superClientId: superClientId,
       timestamp: { $gte: startOfMonth, $lte: endOfMonth },
-    }).populate("table");
+    });
 
-    const filteredOrders = orders.filter((order) =>
-      order.table.superClient.equals(superClientId)
-    );
-
-    const revenue = filteredOrders.reduce((result, order) => {
+    // Calculate the daily revenue for the selected month
+    const revenue = orders.reduce((result, order) => {
       const day = order.timestamp.getDate();
       if (!result[day]) {
         result[day] = 0;
@@ -882,6 +825,7 @@ const getMonthlyRevenueForSpecificMonth = async (req, res) => {
       return result;
     }, {});
 
+    // Format the revenue data to send as response
     const formattedRevenue = Object.entries(revenue).map(([day, total]) => ({
       _id: { day: parseInt(day) },
       dailyRevenue: total,
@@ -896,6 +840,7 @@ const getMonthlyRevenueForSpecificMonth = async (req, res) => {
     });
   }
 };
+
 const getRevenueForCurrentYear = async (req, res) => {
   const superClientId = req.superClientId;
 
@@ -910,30 +855,6 @@ const getRevenueForCurrentYear = async (req, res) => {
   try {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth();
-    const monthlyRevenue = Array(12).fill(0); // Initialize revenue for all 12 months to 0
-
-    // Loop over each month up to the current month
-    for (let month = 0; month <= currentMonth; month++) {
-      const startOfMonth = new Date(currentYear, month, 1);
-      const endOfMonth = new Date(currentYear, month + 1, 0, 23, 59, 59, 999); // Last day of the month
-
-      const orders = await Order.find({
-        status: "archived",
-        timestamp: { $gte: startOfMonth, $lte: endOfMonth },
-      }).populate("table");
-
-      const filteredOrders = orders.filter((order) =>
-        order.table.superClient.equals(superClientId)
-      );
-
-      const totalRevenueForMonth = filteredOrders.reduce((total, order) => {
-        return total + order.totalPrice;
-      }, 0);
-
-      monthlyRevenue[month] = totalRevenueForMonth;
-    }
-
-    // Format the response to include only past and current months
     const months = [
       "January",
       "February",
@@ -949,6 +870,26 @@ const getRevenueForCurrentYear = async (req, res) => {
       "December",
     ];
 
+    // Query all orders for the current year that match the superClientId and status
+    const orders = await Order.find({
+      status: "archived",
+      superClientId: superClientId,
+      timestamp: {
+        $gte: new Date(currentYear, 0, 1), // Start of the year
+        $lte: new Date(currentYear, 11, 31, 23, 59, 59), // End of the year
+      },
+    });
+
+    // Initialize an array to store revenue for each month
+    const monthlyRevenue = Array(12).fill(0);
+
+    // Process orders and accumulate revenue by month
+    orders.forEach((order) => {
+      const month = order.timestamp.getMonth(); // Get the month of the order
+      monthlyRevenue[month] += order.totalPrice; // Add the order's total price to the appropriate month
+    });
+
+    // Format the response to include only up to the current month
     const formattedRevenue = months
       .slice(0, currentMonth + 1) // Only include up to the current month
       .map((monthName, index) => ({
@@ -991,7 +932,7 @@ const getRevenueExcel = async (req, res) => {
       }).populate("table");
 
       const filteredOrders = orders.filter((order) =>
-        order.table.superClient.equals(superClientId)
+        order.superClientId.equals(superClientId)
       );
 
       const totalRevenueForMonth = filteredOrders.reduce((total, order) => {
@@ -1049,53 +990,52 @@ const getRevenueByProductForCurrentWeek = async (req, res) => {
 
   try {
     const now = new Date();
-    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())); // Get the start of the week (Sunday)
+
+    // Get the start of the week (Sunday)
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
     startOfWeek.setHours(0, 0, 0, 0); // Set time to midnight
 
+    // Get the end of the week (Saturday)
     const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6); // Get the end of the week (Saturday)
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
     endOfWeek.setHours(23, 59, 59, 999); // Set time to the end of the day
 
+    // Query for orders within the week for the given superClientId
     const orders = await Order.find({
       status: "archived",
-      timestamp: {
-        $gte: startOfWeek,
-        $lte: endOfWeek,
-      },
-    })
-      .populate("table")
-      .then((orders) =>
-        orders.filter((order) => order.table.superClient.equals(superClientId))
-      );
-
-    const dailyProductRevenue = {};
-
-    for (let i = 0; i <= 6; i++) {
-      const day = new Date(startOfWeek);
-      day.setDate(startOfWeek.getDate() + i);
-      dailyProductRevenue[day.toISOString().split("T")[0]] = {};
-    }
-
-    orders.forEach((order) => {
-      const day = new Date(order.timestamp).toISOString().split("T")[0];
-      if (dailyProductRevenue[day]) {
-        order.products.forEach((product) => {
-          const { productDetails, quantity } = product;
-          if (productDetails) {
-            const productId = productDetails._id;
-            if (!dailyProductRevenue[day][productId]) {
-              dailyProductRevenue[day][productId] = {
-                productName: productDetails.name,
-                totalRevenue: 0,
-              };
-            }
-            dailyProductRevenue[day][productId].totalRevenue +=
-              quantity * productDetails.price;
-          }
-        });
-      }
+      timestamp: { $gte: startOfWeek, $lte: endOfWeek },
+      superClientId: superClientId, // Filter by superClientId directly
     });
 
+    // Initialize an object to store revenue data per day and product
+    const dailyProductRevenue = {};
+
+    // Loop through the orders to populate dailyProductRevenue
+    orders.forEach((order) => {
+      const day = new Date(order.timestamp).toISOString().split("T")[0]; // Format date as YYYY-MM-DD
+      if (!dailyProductRevenue[day]) {
+        dailyProductRevenue[day] = {}; // Initialize the day's product revenue object
+      }
+
+      // Loop through the products and calculate their revenue
+      order.products.forEach((product) => {
+        const { productDetails, quantity } = product;
+        if (productDetails) {
+          const productId = productDetails._id;
+          if (!dailyProductRevenue[day][productId]) {
+            dailyProductRevenue[day][productId] = {
+              productName: productDetails.name,
+              totalRevenue: 0,
+            };
+          }
+          // Calculate the revenue for each product
+          dailyProductRevenue[day][productId].totalRevenue +=
+            quantity * productDetails.price;
+        }
+      });
+    });
+
+    // Format the response to return data for each day of the week
     const formattedRevenue = Object.entries(dailyProductRevenue).map(
       ([date, products]) => ({
         date,

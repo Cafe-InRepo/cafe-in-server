@@ -86,6 +86,7 @@ const createOrder = async (req, res) => {
       statusTimestamps: {
         pending: new Date(),
       },
+      superClientId: table.superClient,
     });
 
     await newOrder.save();

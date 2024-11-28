@@ -89,14 +89,11 @@ const deleteTable = async (req, res) => {
     const table = await Table.findOne({
       _id: req.params.id,
       user: req.userId,
-    }).populate("orders");
+    })
 
     if (!table) {
       return res.status(404).send("Table not found");
     }
-
-    // Delete all orders associated with the table
-    await Order.deleteMany({ _id: { $in: table.orders } });
 
     // Delete the table
     await Table.findByIdAndDelete(req.params.id);
