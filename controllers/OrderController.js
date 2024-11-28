@@ -55,6 +55,27 @@ const createOrder = async (req, res) => {
       return res.status(404).json({ error: "One or more products not found" });
     }
 
+    // Check if all products are available
+    const unavailableProducts = existingProducts.filter(
+      (product) => !product.available
+    );
+
+    // Find unavailable products that were passed in the order
+    const unavailableProductsInOrder = products.filter((item) =>
+      unavailableProducts.some((product) => product._id.equals(item.product))
+    );
+
+    if (unavailableProductsInOrder.length > 0) {
+      logger.warn("One or more products are not available when creating order");
+      return res.status(400).json({
+        error: "One or more products are not available",
+        unavailableProducts: unavailableProductsInOrder.map((item) => ({
+          productId: item.product,
+          requestedQuantity: item.quantity,
+        })), // Return IDs and requested quantities for clarity
+      });
+    }
+
     const totalPrice = await calculateTotalPriceCreating(products);
     console.log(totalPrice);
     const newOrder = new Order({
