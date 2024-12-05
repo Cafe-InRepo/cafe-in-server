@@ -1,4 +1,6 @@
 const Order = require("../models/Order");
+const Bill = require("../models/Bill");
+
 const Product = require("../models/Product");
 const Table = require("../models/Table");
 const logger = require("../logger");
@@ -360,15 +362,12 @@ const rateOrderProducts = async (req, res) => {
 // Confirm payment for selected orders
 const confirmSelectedPayments = async (req, res) => {
   const { orderIds } = req.body;
-  console.log("Received order IDs:", orderIds);
   const superId = req.userId;
-  console.log(superId);
   try {
     if (!Array.isArray(orderIds) || orderIds.length === 0) {
       return res.status(400).json({ message: "No valid order IDs provided" });
     }
 
-    // Validate that each orderId is a valid ObjectId
     const validOrderIds = orderIds.filter((id) =>
       mongoose.Types.ObjectId.isValid(id)
     );
@@ -377,33 +376,48 @@ const confirmSelectedPayments = async (req, res) => {
       return res.status(400).json({ message: "No valid order IDs found" });
     }
 
-    // Update the orders to mark them as paid
-    const updatedOrders = await Order.updateMany(
-      { _id: { $in: validOrderIds }, payed: false },
-      { $set: { payed: true, user: superId } }
-    );
+    const orders = await Order.find({
+      _id: { $in: validOrderIds },
+      payed: false,
+    }).populate("superClientId");
 
-    logger.info("Update Result:", updatedOrders); // Log the update result
-
-    if (updatedOrders.nModified === 0) {
-      return res.status(404).json({
-        message:
-          "No orders were updated. Orders may already be paid or invalid.",
-      });
+    if (!orders.length) {
+      return res.status(404).json({ message: "No unpaid orders found" });
     }
 
-    // Check if all orders for each table are paid, and if so, archive them
+    for (const order of orders) {
+      const superClientId = order.superClientId;
+      const totalPaidAmount = order.totalPrice;
+
+      if (superClientId) {
+        const bill = await Bill.findOne({ client: superClientId });
+
+        if (bill) {
+          const commission = totalPaidAmount * 0.04;
+          bill.totalAmount += commission;
+          await bill.save();
+        } else {
+          console.log(
+            `No bill found for superClient ${superClientId}. Payment continues without updating a bill.`
+          );
+        }
+      }
+
+      order.payed = true;
+      order.user = superId;
+      await order.save();
+    }
+
     const tablesToCheck = await Order.distinct("table", {
       _id: { $in: validOrderIds },
     });
 
-    const archiveUpdates = await Promise.all(
+    await Promise.all(
       tablesToCheck.map(async (tableId) => {
         const unpaidOrders = await Order.find({ table: tableId, payed: false });
 
         if (unpaidOrders.length === 0) {
-          // Archive all orders for this table
-          return Order.updateMany(
+          await Order.updateMany(
             { table: tableId },
             { $set: { status: "archived", user: superId } }
           );
@@ -414,22 +428,17 @@ const confirmSelectedPayments = async (req, res) => {
     res.status(200).json({
       message:
         "Selected orders confirmed as paid, and relevant orders archived",
-      updatedOrders,
-      archiveUpdates,
     });
   } catch (error) {
     console.error("Error confirming selected payments:", error);
-    res.status(500).json({
-      message: "Error confirming selected payments",
-      error: error.message,
-    });
+    res.status(500).json({ message: "Error confirming selected payments" });
   }
 };
 
 const confirmSelectedProductsPayments = async (req, res) => {
   const { orderId, productIds } = req.body;
   const superId = req.userId;
-  console.log(superId);
+
   try {
     if (!mongoose.Types.ObjectId.isValid(orderId)) {
       return res.status(400).json({ message: "Invalid order ID provided" });
@@ -439,36 +448,34 @@ const confirmSelectedProductsPayments = async (req, res) => {
       return res.status(400).json({ message: "No valid product IDs provided" });
     }
 
-    // Validate each productId and remove suffix
     const validProductIds = productIds
-      .map((id) => id.split("-")[0]) // Remove instance suffix
+      .map((id) => id.split("-")[0])
       .filter((id) => mongoose.Types.ObjectId.isValid(id));
 
     if (validProductIds.length === 0) {
       return res.status(400).json({ message: "No valid product IDs found" });
     }
 
-    // Find the order and update the payment status of the specified products
-    const order = await Order.findById(orderId);
+    const order = await Order.findById(orderId).populate("superClientId");
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    let totalPaidAmount = 0;
+
     const updatedProducts = order.products.map((product) => {
-      // Check if this product is one of the selected products
       if (validProductIds.includes(product.product.toString())) {
-        // Calculate how many products are being paid for
         const selectedCount = productIds.filter(
           (id) => id.split("-")[0] === product.product.toString()
         ).length;
 
-        // If there is still a remaining quantity to pay for
         if (product.payedQuantity < product.quantity) {
           const remainingQuantity = product.quantity - product.payedQuantity;
-          const quantityToPay = Math.min(selectedCount, remainingQuantity); // Ensure we don't overpay
+          const quantityToPay = Math.min(selectedCount, remainingQuantity);
 
-          product.payedQuantity += quantityToPay; // Update payedQuantity
+          product.payedQuantity += quantityToPay;
+          totalPaidAmount += quantityToPay * product.productDetails.price;
         }
       }
       return product;
@@ -476,7 +483,6 @@ const confirmSelectedProductsPayments = async (req, res) => {
 
     order.products = updatedProducts;
 
-    // Check if all products in the order are fully paid, and if so, set order's payed status to true
     const allProductsPaid = order.products.every(
       (product) => product.payedQuantity >= product.quantity
     );
@@ -485,12 +491,26 @@ const confirmSelectedProductsPayments = async (req, res) => {
       order.payed = true;
     }
 
+    const superClientId = order.superClientId;
+
+    if (superClientId) {
+      const bill = await Bill.findOne({ client: superClientId });
+
+      if (bill) {
+        const commission = totalPaidAmount * 0.04;
+        bill.totalAmount += commission;
+        await bill.save();
+      } else {
+        console.log(
+          `No bill found for superClient ${superClientId}. Payment continues without updating a bill.`
+        );
+      }
+    }
+
     await order.save();
 
-    // Check if the table associated with this order has any unpaid orders
     const unpaidOrders = await Order.find({ table: order.table, payed: false });
 
-    // If no unpaid orders remain for the table, archive all orders for that table
     if (unpaidOrders.length === 0) {
       await Order.updateMany(
         { table: order.table },
@@ -505,10 +525,9 @@ const confirmSelectedProductsPayments = async (req, res) => {
     });
   } catch (error) {
     console.error("Error confirming selected products payments:", error);
-    res.status(500).json({
-      message: "Error confirming selected products payments",
-      error: error.message,
-    });
+    res
+      .status(500)
+      .json({ message: "Error confirming selected products payments" });
   }
 };
 

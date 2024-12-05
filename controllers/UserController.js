@@ -455,7 +455,7 @@ const qrLogin = async (req, res) => {
         number: tableData.number,
       },
     };
-
+    console.log(tableData.number);
     jwt.sign(
       payload,
       process.env.JWT_SECRET_KEY,
@@ -463,7 +463,11 @@ const qrLogin = async (req, res) => {
       (err, newToken) => {
         if (err) throw err;
 
-        res.json({ token: newToken, message: "Logged in successfully" });
+        res.json({
+          token: newToken,
+          message: "Logged in successfully",
+          tableNumber: tableData.number,
+        });
       }
     );
   } catch (err) {

@@ -6,7 +6,7 @@ const userSchema = new Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   img: { type: String },
-  verified: { type: Boolean, required: false, default: false },
+  verified: { type: Boolean, default: false },
   role: {
     type: String,
     enum: ["client", "superClient"],
@@ -19,6 +19,52 @@ const userSchema = new Schema({
     ref: "User",
     required: function () {
       return this.role === "client";
+    },
+  },
+  // Fields specific to superClient
+  phoneNumber: {
+    type: String,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
+  contractNumber: {
+    type: String,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
+  percentage: {
+    type: Number,
+    required: function () {
+      return this.role === "superClient";
+    },
+    min: 0,
+    max: 100,
+  },
+  placeName: {
+    type: String,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
+  placeLocation: {
+    type: {
+      long: {
+        type: Number,
+        required: function () {
+          return this.role === "superClient";
+        },
+      },
+      lat: {
+        type: Number,
+        required: function () {
+          return this.role === "superClient";
+        },
+      },
+    },
+    required: function () {
+      return this.role === "superClient";
     },
   },
 });

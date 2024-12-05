@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 const productRoutes = require("./routes/productRoutes");
 const helmet = require("helmet");
 const menuRoutes = require("./routes/menuRoutes");
+const billRoutes = require("./routes/billRoutes");
+
 const userRoutes = require("./routes/userRoutes");
 const tablesRoutes = require("./routes/tableRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
@@ -84,6 +86,7 @@ app.use("/sections", sectionRoutes);
 app.use("/products", productRoutes);
 app.use("/order", orderRoutes);
 app.use("/menu", menuRoutes);
+app.use("/bills", billRoutes);
 app.use("/dashboard", dashboardRoutes);
 
 // Notification support
