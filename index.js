@@ -18,7 +18,6 @@ const cloudinary = require("./Cloudinary/cloudinary");
 const bodyParser = require("body-parser");
 const http = require("http");
 const socketIo = require("socket.io");
-
 // Initialize express and create an HTTP server
 const app = express();
 const server = http.createServer(app);

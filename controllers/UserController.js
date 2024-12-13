@@ -425,18 +425,19 @@ const loginTable = async (req, res) => {
 
 //QR login
 
+
 const qrLogin = async (req, res) => {
-  const { token } = req.body; // Now only getting the token from the query
+  const { token } = req.body; // Get the token from the request body
   try {
     // Verify the token and decode the payload
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET_KEY);
 
-    // Extract the table number directly from the decoded token payload
+    // Extract the table number and superClient from the decoded token payload
     const { number: tableNumber, superClient } = decodedToken;
 
-    // Find the table based on the table number
+    // Find the table based on the table number and superClient
     const tableData = await Table.findOne({
-      number: tableNumber, // Use table number decoded from token
+      number: tableNumber,
       superClient: superClient,
     });
 
@@ -444,18 +445,30 @@ const qrLogin = async (req, res) => {
       return res.status(400).json({ msg: "Table not found or not authorized" });
     }
 
+    // Fetch the superClient's details to get the place location
+    const superClientData = await User.findById(superClient);
+
+    if (!superClientData || superClientData.role !== "superClient") {
+      return res
+        .status(400)
+        .json({ msg: "SuperClient not found or not authorized" });
+    }
+
+    const { placeName, placeLocation } = superClientData; // Extract placeName and placeLocation
+
     // Create a session or token for the logged-in user
     const payload = {
       user: {
         id: decodedToken.superClient, // Get the user ID from the token
-        role: "superClient", // Use the role in case you need to handle superClient
+        role: "superClient", // Use the role for superClient
       },
       table: {
         id: tableData._id,
         number: tableData.number,
       },
     };
-    console.log(tableData.number);
+
+    // Sign and send the new token along with the place location
     jwt.sign(
       payload,
       process.env.JWT_SECRET_KEY,
@@ -467,6 +480,8 @@ const qrLogin = async (req, res) => {
           token: newToken,
           message: "Logged in successfully",
           tableNumber: tableData.number,
+          placeName, // Include the place name in the response
+          placeLocation, // Include the place location in the response
         });
       }
     );
@@ -603,18 +618,58 @@ const changeUserVerificationStatus = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { fullName, email, password } = req.body;
+    const role = req.role;
+    const {
+      fullName,
+      email,
+      password,
+      superClient,
+      phoneNumber,
+      contractNumber,
+      percentage,
+      placeName,
+      longitude,
+      latitude,
+    } = req.body;
 
-    const updateData = { fullName, email, role };
+    // Initialize update data with fields that can always be updated
+    const updateData = {};
+    if (fullName) updateData.fullName = fullName;
+    if (email) updateData.email = email;
+    if (role) updateData.role = role;
+
+    // Handle password hashing if provided
     if (password) {
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
       updateData.password = hashedPassword;
     }
 
+    // Role-specific updates
+    if (role === "client") {
+      if (superClient !== undefined)
+        updateData.superClient = superClient || null; // Set to null if empty
+    } else if (role === "superClient") {
+      if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+      if (contractNumber !== undefined)
+        updateData.contractNumber = contractNumber;
+      if (percentage !== undefined) updateData.percentage = percentage;
+      if (placeName !== undefined) updateData.placeName = placeName;
+
+      // Handle placeLocation update (latitude and longitude)
+      if (latitude && longitude) {
+        updateData.placeLocation = {
+          lat: latitude,
+          long: longitude,
+        };
+      }
+    }
+
+    // Update the user in the database
     const user = await User.findByIdAndUpdate(userId, updateData, {
       new: true,
     });
+
     if (!user) {
       logger.warn(`User with ID ${userId} not found for update`);
       return res.status(404).json({ message: "User not found" });

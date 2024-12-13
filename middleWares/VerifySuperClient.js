@@ -15,6 +15,7 @@ const verifySuperClient = (req, res, next) => {
         .json({ error: "Access denied. Insufficient permissions." });
     }
     req.superClientId = decoded.userId; // Assuming the superClient ID is in the token
+    req.role = decoded.role;
     next();
   } catch (error) {
     res.status(400).json({ error: "Invalid token." });
