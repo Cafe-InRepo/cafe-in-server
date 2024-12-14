@@ -68,6 +68,13 @@ const userSchema = new Schema({
       return this.role === "superClient";
     },
   },
+  distance: {
+    type: Number,
+    default: 300,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
 });
 
 const User = mongoose.model("User", userSchema);

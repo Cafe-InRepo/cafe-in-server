@@ -425,7 +425,6 @@ const loginTable = async (req, res) => {
 
 //QR login
 
-
 const qrLogin = async (req, res) => {
   const { token } = req.body; // Get the token from the request body
   try {
@@ -454,7 +453,7 @@ const qrLogin = async (req, res) => {
         .json({ msg: "SuperClient not found or not authorized" });
     }
 
-    const { placeName, placeLocation } = superClientData; // Extract placeName and placeLocation
+    const { placeName, placeLocation, distance } = superClientData; // Extract placeName and placeLocation
 
     // Create a session or token for the logged-in user
     const payload = {
@@ -482,6 +481,7 @@ const qrLogin = async (req, res) => {
           tableNumber: tableData.number,
           placeName, // Include the place name in the response
           placeLocation, // Include the place location in the response
+          distance,
         });
       }
     );
