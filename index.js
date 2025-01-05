@@ -10,6 +10,7 @@ const userRoutes = require("./routes/userRoutes");
 const tablesRoutes = require("./routes/tableRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const sectionRoutes = require("./routes/sectionRoute");
+const postRoutes = require("./routes/postRoutes");
 
 const orderRoutes = require("./routes/orderRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
@@ -87,6 +88,7 @@ app.use("/order", orderRoutes);
 app.use("/menu", menuRoutes);
 app.use("/bills", billRoutes);
 app.use("/dashboard", dashboardRoutes);
+app.use("/posts", postRoutes);
 
 // Notification support
 io.on("connection", (socket) => {

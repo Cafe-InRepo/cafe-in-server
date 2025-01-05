@@ -1,6 +1,22 @@
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
+const reservationSchema = new Schema({
+  user: {
+    type: Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  startTime: {
+    type: Date,
+    required: true,
+  },
+  endTime: {
+    type: Date,
+    required: true,
+  },
+});
+
 const tableSchema = new Schema({
   number: {
     type: Number,
@@ -26,6 +42,7 @@ const tableSchema = new Schema({
     type: String, // Will store the QR code as a data URL (base64 string)
     required: false,
   },
+  reservations: [reservationSchema], // New field for reservations
 });
 
 // Create a compound unique index
