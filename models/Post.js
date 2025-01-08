@@ -28,7 +28,12 @@ const ReactionSchema = new Schema({
     enum: ["like", "love", "yummy", "haha", "wow", "sad", "angry"],
     required: true,
   },
-  users: [{ type: Schema.Types.ObjectId, ref: "Customer" || "User" }], // Users who reacted
+  users: [
+    {
+      id: { type: Schema.Types.ObjectId, required: true },
+      UserType: { type: String, enum: ["Customer", "User"], required: true },
+    },
+  ], // Users who reacted
 });
 
 // Post schema

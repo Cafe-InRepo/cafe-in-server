@@ -90,38 +90,75 @@ const createPost = async (req, res) => {
 const getAllPosts = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query; // Default to page 1, limit 10
+    const superClientId = req.superClientId;
 
-    const posts = await Post.find({ owner: req.superClientId })
+    const posts = await Post.find({ owner: superClientId })
       .skip((page - 1) * limit)
       .limit(parseInt(limit))
-      .populate("owner", "fullName email")
-      .populate("reactions.users", "fullName email");
+      .populate("owner", "fullName email") // Populate owner's details
+      .lean(); // Use lean for faster performance and direct object manipulation
 
     const populatedPosts = await Promise.all(
       posts.map(async (post) => {
-        const postObj = post.toObject();
+        const postObj = { ...post };
 
+        // Populate comments and replies
         const populatedComments = await Promise.all(
-          postObj.comments.map(async (comment) => {
+          post.comments.map(async (comment) => {
             const commentData = { ...comment };
+
+            // Populate comment author details
             if (comment.author && comment.author.type && comment.author.id) {
               if (comment.author.type === "Customer") {
                 commentData.authorDetails = await Customer.findById(
                   comment.author.id,
-                  "fullName email"
-                );
+                  "fullName email username"
+                ).lean();
               } else if (comment.author.type === "User") {
                 commentData.authorDetails = await User.findById(
                   comment.author.id,
-                  "fullName email"
-                );
+                  "fullName email username"
+                ).lean();
               }
             }
+
+            // Populate replies and their authors
+            const populatedReplies = await Promise.all(
+              comment.replies.map(async (reply) => {
+                const replyData = { ...reply };
+                if (reply.author && reply.author.type && reply.author.id) {
+                  if (reply.author.type === "Customer") {
+                    replyData.authorDetails = await Customer.findById(
+                      reply.author.id,
+                      "fullName email username"
+                    ).lean();
+                  } else if (reply.author.type === "User") {
+                    replyData.authorDetails = await User.findById(
+                      reply.author.id,
+                      "fullName email username"
+                    ).lean();
+                  }
+                }
+                return replyData;
+              })
+            );
+
+            commentData.replies = populatedReplies;
             return commentData;
           })
         );
 
         postObj.comments = populatedComments;
+
+        // Check reactions and find the reaction by req.superClientId
+        const superClientReaction = post.reactions.find((reaction) =>
+          reaction.users.some((user) => user.id.toString() === superClientId)
+        );
+
+        postObj.storedReaction = superClientReaction
+          ? superClientReaction.type
+          : null; // Return the reaction type if found, otherwise null
+
         return postObj;
       })
     );
@@ -327,29 +364,97 @@ const addReply = async (req, res) => {
 const addReaction = async (req, res) => {
   try {
     const { postId } = req.params;
-    const { type, userId } = req.body;
+    const { type, userType } = req.body;
+    const userId = req.superClientId;
 
-    const post = await Post.findById(postId);
-    if (!post) {
-      return res.status(404).json({ message: "Post not found." });
+    // Validate input
+    if (!type || !userId || !userType) {
+      return res.status(400).json({ message: "Invalid input data." });
     }
 
-    let reaction = post.reactions.find((r) => r.type === type);
-    if (!reaction) {
-      reaction = { type, users: [] };
-      post.reactions.push(reaction);
+    // Check if the reaction type is valid
+    const validReactions = [
+      "like",
+      "love",
+      "yummy",
+      "haha",
+      "wow",
+      "sad",
+      "angry",
+    ];
+    if (!validReactions.includes(type)) {
+      return res.status(400).json({ message: "Invalid reaction type." });
     }
 
-    if (!reaction.users.includes(userId)) {
-      reaction.users.push(userId);
+    // Check if the user already reacted with the same type
+    const existingReaction = await Post.findOne({
+      _id: postId,
+      "reactions.type": type,
+      "reactions.users.id": userId,
+    });
+
+    if (existingReaction) {
+      // Remove the user's reaction of the same type
+      await Post.updateOne(
+        { _id: postId, "reactions.type": type },
+        {
+          $pull: {
+            "reactions.$.users": { id: userId },
+          },
+        }
+      );
+
+      return res
+        .status(200)
+        .json({ message: "Reaction removed successfully." });
     }
 
-    await post.save();
-    res.status(200).json({ message: "Reaction added successfully.", post });
-  } catch (error) {
+    // Remove the user's existing reaction of a different type
+    await Post.updateOne(
+      { _id: postId },
+      {
+        $pull: {
+          "reactions.$[].users": { id: userId }, // Remove the user from all reaction types
+        },
+      }
+    );
+
+    // Add the new reaction or update an existing reaction type
+    const result = await Post.updateOne(
+      {
+        _id: postId,
+        "reactions.type": type, // Match the reaction type
+      },
+      {
+        $addToSet: {
+          "reactions.$.users": { id: userId, userType }, // Add the user to the users array
+        },
+      }
+    );
+
+    // If the reaction type doesn't exist, create it
+    if (result.matchedCount === 0) {
+      await Post.updateOne(
+        { _id: postId },
+        {
+          $push: {
+            reactions: {
+              type,
+              users: [{ id: userId, userType }], // Add the new reaction type with the user
+            },
+          },
+        }
+      );
+    }
+
     res
-      .status(500)
-      .json({ message: "Error adding reaction.", error: error.message });
+      .status(200)
+      .json({ message: "Reaction added or updated successfully." });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error adding or updating reaction.",
+      error: error.message,
+    });
   }
 };
 
