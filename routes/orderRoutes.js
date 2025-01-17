@@ -11,6 +11,7 @@ const {
   getOrdersBySuperClientIdFIFO,
   updateOrderStatus,
   confirmSelectedProductsPayments,
+  tipOrder,
 } = require("../controllers/OrderController");
 const decodeTableToken = require("../middleWares/decodeTableToken");
 //const verifySuperClient = require("../middleWares/VerifySuperClient");
@@ -23,6 +24,7 @@ router.post("/", decodeTableToken, createOrder);
 router.post("/manual", verifyClientOrSuperClient, createOrder);
 
 router.post("/:orderId/rate", rateOrderProducts);
+router.post("/:orderId/tips", tipOrder);
 router.put("/:orderId", updateOrder);
 router.patch(
   "/update-status/:orderId",

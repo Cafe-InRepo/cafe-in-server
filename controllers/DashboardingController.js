@@ -435,6 +435,7 @@ const getUserArchivedOrders = async (req, res) => {
         totalPrice: productEntry.quantity * productEntry.productDetails.price, // Calculate total for each product
       })),
       totalPrice: order.totalPrice, // The total price of the entire order
+      tips: order.tips,
       timestamp: order.timestamp, // Timestamp when the order was placed
     }));
 

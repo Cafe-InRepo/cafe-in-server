@@ -80,6 +80,10 @@ const orderSchema = new Schema({
     type: String,
     required: false,
   },
+  tips: {
+    type: Number,
+    required: false,
+  },
 });
 
 // the trigger is used to calculate each time the order spent in each status

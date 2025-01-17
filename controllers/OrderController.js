@@ -158,7 +158,7 @@ const getOrder = async (req, res) => {
 const updateOrder = async (req, res) => {
   try {
     const orderId = req.params.orderId;
-    const { products, table, status, payed } = req.body;
+    const { products, table, status, payed, comment } = req.body;
 
     if (products && products.length === 0) {
       const deletedOrder = await Order.findByIdAndDelete(orderId);
@@ -180,7 +180,7 @@ const updateOrder = async (req, res) => {
       return res.status(200).json({ message: "Order deleted successfully" });
     }
 
-    const updateData = { table, status, payed };
+    const updateData = { table, status, payed, comment };
     if (products) {
       const totalPrice = await calculateTotalPrice(products);
       updateData.products = products;
@@ -356,6 +356,34 @@ const rateOrderProducts = async (req, res) => {
   } catch (error) {
     logger.error(
       `Error rating products for order ${req.params.orderId}: ${error.message}`,
+      error
+    );
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// add tips to order
+const tipOrder = async (req, res) => {
+  try {
+    const orderId = req.params.orderId;
+    const { selectedTip } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      logger.warn(
+        `Order with ID ${orderId} not found when attempting to rate products`
+      );
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    const gaveTips = selectedTip;
+    order.tips = gaveTips;
+    await order.save();
+    logger.info(`tips added for order ${orderId}`);
+    res.status(200).json({ message: "Ratings submitted successfully" });
+  } catch (error) {
+    logger.error(
+      `Error adding tips for order ${req.params.orderId}: ${error.message}`,
       error
     );
     res.status(500).json({ error: "Internal server error" });
@@ -671,4 +699,5 @@ module.exports = {
   getOrdersBySuperClientIdFIFO,
   updateOrderStatus,
   confirmSelectedProductsPayments,
+  tipOrder,
 };
