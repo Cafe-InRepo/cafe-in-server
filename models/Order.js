@@ -76,6 +76,10 @@ const orderSchema = new Schema({
     ref: "User", // Reference to User model for superClient
     required: false,
   },
+  comment: {
+    type: String,
+    required: false,
+  },
 });
 
 // the trigger is used to calculate each time the order spent in each status

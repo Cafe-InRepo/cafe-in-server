@@ -37,6 +37,7 @@ const calculateTotalPriceCreating = async (products) => {
 const createOrder = async (req, res) => {
   try {
     const { products } = req.body;
+    const { comment } = req.body;
     const tableId = req.tableId || req.body.tableId;
     const userId = req.user;
     if (!products) {
@@ -89,6 +90,7 @@ const createOrder = async (req, res) => {
         pending: new Date(),
       },
       superClientId: table.superClient,
+      comment,
     });
 
     await newOrder.save();

@@ -93,6 +93,7 @@ const getAllPosts = async (req, res) => {
     const superClientId = req.superClientId;
 
     const posts = await Post.find({ owner: superClientId })
+      .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit))
       .populate("owner", "fullName email") // Populate owner's details
@@ -493,13 +494,36 @@ const deletePost = async (req, res) => {
   try {
     const { postId } = req.params;
 
-    const post = await Post.findByIdAndDelete(postId);
+    // Find the post
+    const post = await Post.findById(postId);
     if (!post) {
       return res.status(404).json({ message: "Post not found." });
     }
 
+    // Remove media files from Cloudinary
+    const deleteMediaPromises = post.media.map(async (file) => {
+      try {
+        const publicId = file.url.split("/").slice(-1)[0].split(".")[0];
+        const resourceType = file.type === "image" ? "image" : "video";
+
+        await cloudinary.uploader.destroy(publicId, {
+          resource_type: resourceType,
+        });
+      } catch (error) {
+        console.error(
+          `Failed to delete media from Cloudinary: ${error.message}`
+        );
+      }
+    });
+
+    await Promise.all(deleteMediaPromises);
+
+    // Delete the post from the database
+    await Post.findByIdAndDelete(postId);
+
     res.status(200).json({ message: "Post deleted successfully." });
   } catch (error) {
+    console.error("Error deleting post:", error);
     res
       .status(500)
       .json({ message: "Error deleting post.", error: error.message });

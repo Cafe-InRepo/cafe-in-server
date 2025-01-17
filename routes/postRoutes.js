@@ -16,6 +16,6 @@ router.post("/:postId/comment", verifySuperClient, addComment);
 router.post("/:postId/reply/:commentId", verifySuperClient, addReply);
 
 router.get("/", verifySuperClient, getAllPosts);
-router.delete("/:sectionId", deletePost);
+router.delete("/:postId", deletePost);
 
 module.exports = router;
