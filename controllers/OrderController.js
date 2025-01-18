@@ -36,10 +36,10 @@ const calculateTotalPriceCreating = async (products) => {
 
 const createOrder = async (req, res) => {
   try {
-    const { products } = req.body;
-    const { comment } = req.body;
+    const { products, comment } = req.body;
     const tableId = req.tableId || req.body.tableId;
     const userId = req.user;
+
     if (!products) {
       logger.warn("Products are required to create an order");
       return res.status(400).json({ error: "Products are required" });
@@ -53,17 +53,16 @@ const createOrder = async (req, res) => {
 
     const productIds = products.map((item) => item.product);
     const existingProducts = await Product.find({ _id: { $in: productIds } });
+
     if (existingProducts.length !== products.length) {
       logger.warn("One or more products not found when creating order");
       return res.status(404).json({ error: "One or more products not found" });
     }
 
-    // Check if all products are available
     const unavailableProducts = existingProducts.filter(
       (product) => !product.available
     );
 
-    // Find unavailable products that were passed in the order
     const unavailableProductsInOrder = products.filter((item) =>
       unavailableProducts.some((product) => product._id.equals(item.product))
     );
@@ -75,12 +74,12 @@ const createOrder = async (req, res) => {
         unavailableProducts: unavailableProductsInOrder.map((item) => ({
           productId: item.product,
           requestedQuantity: item.quantity,
-        })), // Return IDs and requested quantities for clarity
+        })),
       });
     }
 
     const totalPrice = await calculateTotalPriceCreating(products);
-    console.log(totalPrice);
+
     const newOrder = new Order({
       products,
       table: table._id,
@@ -95,18 +94,24 @@ const createOrder = async (req, res) => {
 
     await newOrder.save();
 
+    // Populate products and table sequentially
+    const populatedOrder = await newOrder.populate("products.product");
+
+    await populatedOrder.populate("table");
+
     // Update the table with the new order reference
     table.orders.push(newOrder._id);
     await table.save();
 
     logger.info(`Order created successfully for table ${table._id}`);
 
-    // Emit order created event
-    req.io.emit("newOrder", newOrder);
+    // Emit order created event with populated order
+    req.io.emit("newOrder", populatedOrder);
 
-    res
-      .status(201)
-      .json({ message: "Order created successfully", order: newOrder });
+    res.status(201).json({
+      message: "Order created successfully",
+      order: populatedOrder,
+    });
   } catch (error) {
     logger.error("Error creating order:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -189,7 +194,9 @@ const updateOrder = async (req, res) => {
 
     const order = await Order.findByIdAndUpdate(orderId, updateData, {
       new: true,
-    }).populate("products.product");
+    })
+      .populate("products.product")
+      .populate("table");
     if (!order) {
       logger.warn(
         `Order with ID ${orderId} not found when attempting to update`
@@ -229,7 +236,8 @@ const deleteOrder = async (req, res) => {
     });
 
     logger.info(`Order with ID ${orderId} deleted successfully`);
-    req.io.emit("newOrder", order);
+    req.io.emit("deleteOrder", order._id);
+    console.log("deleted order id is", order._id);
     res.status(200).json({ message: "Order deleted successfully" });
   } catch (error) {
     logger.error(
