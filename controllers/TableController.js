@@ -200,12 +200,12 @@ const moveOrdersToTable = async (req, res) => {
 
     // Move orders to the target table
     sourceTable.orders.forEach((order) => {
-      targetTable.orders.push(order._id);
+      targetTable.orders.push(order._id); // Add to target table
     });
 
-    // Remove orders from the source table
+    // Remove orders from the source table (clear the orders array)
     sourceTable.orders = sourceTable.orders.filter(
-      (order) => order.status === "archived"
+      (order) => order.status === "archived" // Keep only archived orders if needed
     );
 
     // Save both tables
