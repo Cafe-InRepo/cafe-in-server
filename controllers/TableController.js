@@ -158,6 +158,68 @@ const getTableById = async (req, res) => {
       .json({ error: "Internal server error", details: error.message });
   }
 };
+//move orders from table to another
+const moveOrdersToTable = async (req, res) => {
+  try {
+    const { sourceTableId, targetTableId } = req.body;
+    const superClient = req.superClientId;
+
+    // Find the source table and ensure it belongs to the authenticated superClient
+    const sourceTable = await Table.findOne({
+      _id: sourceTableId,
+      superClient,
+    }).populate({
+      path: "orders",
+      match: { status: { $ne: "archived" } }, // Exclude archived orders
+    });
+
+    if (!sourceTable) {
+      return res.status(404).json({
+        error: "Source table not found or does not belong to the SuperClient",
+      });
+    }
+
+    // Check if there are any non-archived orders
+    if (!sourceTable.orders.length) {
+      return res.status(400).json({
+        error: "No orders with status not archived in the source table",
+      });
+    }
+
+    // Find the target table and ensure it belongs to the authenticated superClient
+    const targetTable = await Table.findOne({
+      _id: targetTableId,
+      superClient,
+    });
+
+    if (!targetTable) {
+      return res.status(404).json({
+        error: "Target table not found or does not belong to the SuperClient",
+      });
+    }
+
+    // Move orders to the target table
+    sourceTable.orders.forEach((order) => {
+      targetTable.orders.push(order._id);
+    });
+
+    // Remove orders from the source table
+    sourceTable.orders = sourceTable.orders.filter(
+      (order) => order.status === "archived"
+    );
+
+    // Save both tables
+    await targetTable.save();
+    await sourceTable.save();
+
+    res.status(200).json({ message: "Orders moved successfully" });
+  } catch (error) {
+    console.error(`Error moving orders: ${error.message}`);
+    res
+      .status(500)
+      .json({ error: "Internal server error", details: error.message });
+  }
+};
 
 const createReservation = async (req, res) => {
   try {
@@ -388,4 +450,5 @@ module.exports = {
   updateReservation,
   getAllReservations,
   getTablesWithReservations,
+  moveOrdersToTable,
 };

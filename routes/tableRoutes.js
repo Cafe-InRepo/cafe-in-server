@@ -15,6 +15,7 @@ const {
   deleteReservation,
   updateReservation,
   getTablesWithReservations,
+  moveOrdersToTable,
 } = require("../controllers/TableController");
 
 const router = express.Router();
@@ -40,6 +41,7 @@ router.post(
   getTablesWithReservations
 ); // Get reservations
 router.post("/availability", verifyClientOrSuperClient, checkTableAvailability); // Check table availability for a time range
+router.post("/move-orders", verifyClientOrSuperClient, moveOrdersToTable); // Check table availability for a time range
 router.delete(
   "/:tableId/reservations/:reservationId",
   verifyClientOrSuperClient,
