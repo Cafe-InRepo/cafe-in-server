@@ -198,14 +198,20 @@ const moveOrdersToTable = async (req, res) => {
       });
     }
 
-    // Move orders to the target table
-    sourceTable.orders.forEach((order) => {
-      targetTable.orders.push(order._id); // Add to target table
-    });
+    // Update orders to reference the target table
+    const orderIds = sourceTable.orders.map((order) => order._id);
 
-    // Remove orders from the source table (clear the orders array)
+    await Order.updateMany(
+      { _id: { $in: orderIds } },
+      { $set: { table: targetTableId } }
+    );
+
+    // Add orders to the target table
+    targetTable.orders.push(...orderIds);
+
+    // Remove orders from the source table (keep only archived orders)
     sourceTable.orders = sourceTable.orders.filter(
-      (order) => order.status === "archived" // Keep only archived orders if needed
+      (order) => order.status === "archived"
     );
 
     // Save both tables
