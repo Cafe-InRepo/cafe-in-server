@@ -1,47 +1,43 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
-const productRoutes = require("./routes/productRoutes");
 const helmet = require("helmet");
+const bodyParser = require("body-parser");
+const http = require("http");
+const socketIo = require("socket.io");
+const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const logger = require("./logger"); // Custom logger
+const User = require("./models/User"); // User model
+
+// Route imports
+const productRoutes = require("./routes/productRoutes");
 const menuRoutes = require("./routes/menuRoutes");
 const billRoutes = require("./routes/billRoutes");
-
 const userRoutes = require("./routes/userRoutes");
 const tablesRoutes = require("./routes/tableRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const sectionRoutes = require("./routes/sectionRoute");
 const postRoutes = require("./routes/postRoutes");
-
 const orderRoutes = require("./routes/orderRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
-const logger = require("./logger"); // Import the logger
-const cloudinary = require("./Cloudinary/cloudinary");
-const bodyParser = require("body-parser");
-const http = require("http");
-const socketIo = require("socket.io");
-// Initialize express and create an HTTP server
+
+dotenv.config(); // Load environment variables
+
+// Initialize express app and server
 const app = express();
 const server = http.createServer(app);
 
-const cors = require("cors");
-// Initialize socket.io with CORS settings
+// Initialize socket.io with CORS
 const io = socketIo(server, {
   cors: {
-    origin: "*", // Specify your client URL if it's different
+    origin: "*", // Update with specific client URL in production
     methods: ["GET", "POST"],
   },
 });
 
-// Enable CORS
-app.use(
-  cors({
-    origin: "*", // Allow only this specific origin
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-    credentials: true, // Include this if you need to allow credentials like cookies or HTTP authentication
-  })
-);
-
 // Middleware
+app.use(cors({ origin: "*", methods: "GET,HEAD,PUT,PATCH,POST,DELETE" }));
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(helmet());
@@ -52,14 +48,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// Mongoose connection
-dotenv.config();
+// MongoDB connection
 const connect = async () => {
   try {
     await mongoose.connect(process.env.MONGO);
     logger.info("Connected to MongoDB");
   } catch (error) {
-    logger.error("Error connecting to MongoDB: ", error);
+    logger.error("Error connecting to MongoDB:", error);
     throw error;
   }
 };
@@ -67,14 +62,13 @@ const connect = async () => {
 mongoose.connection.on("disconnected", () => {
   logger.warn("MongoDB disconnected");
 });
-
 mongoose.connection.on("connected", () => {
   logger.info("MongoDB connected");
 });
 
-// Log incoming requests
+// Logging incoming requests
 app.use((req, res, next) => {
-  logger.info(`Received request: ${req.method} ${req.url}`);
+  logger.info(`Incoming request: ${req.method} ${req.url}`);
   next();
 });
 
@@ -90,23 +84,145 @@ app.use("/bills", billRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/posts", postRoutes);
 
-// Notification support
-io.on("connection", (socket) => {
-  socket.on("supportRequest", (data) => {
-    logger.info(`Support request from Table ${data.tableNumber}`);
+// Socket.io connection handling
+// io.on("connection", async (socket) => {
+//   const token = socket.handshake.auth.token;
 
-    // Broadcast the support request to all admin/dashboard clients
-    io.emit("supportNotification", { tableNumber: data.tableNumber });
-  });
+//   if (!token) {
+//     logger.warn("No token provided in socket handshake");
+//     return socket.disconnect();
+//   }
 
-  // Handle call answer from admin/dashboard
-  socket.on("supportCallAnswered", (data) => {
-    io.emit("callAnswered", { tableNumber: data.tableNumber });
-  });
+//   try {
+//     const SECRET_KEY = process.env.JWT_SECRET_KEY; // Secret key for JWT
+//     const decoded = jwt.verify(token, SECRET_KEY);
 
-  socket.on("disconnect", () => {
-    logger.info("Client disconnected");
-  });
+//     // Extract user ID from token and find the user in the database
+//     const userId = decoded.user.id || decoded.userId;
+//     console.log(userId);
+//     if (decoded.role === "client") {
+//       const user = await User.findById(decoded.userId);
+//       if (user && user.superClient) {
+//         userId = user.superClient; // Assuming the superClient ID is in the user's document
+//       }
+//     }
+//     const user = await User.findById(userId);
+
+//     if (!user) {
+//       logger.warn(`User with ID ${userId} not found`);
+//       return socket.disconnect();
+//     }
+
+//     // Assign the user to the appropriate room
+//     if (user.role === "superClient") {
+//       socket.join(user._id.toString()); // SuperClient's room
+//       logger.info(`SuperClient ${user.fullName} joined room ${user._id}`);
+//     } else if (user.role === "client" && user.superClient) {
+//       socket.join(user.superClient.toString()); // Join their SuperClient's room
+//       logger.info(
+//         `Client ${user.fullName} joined superClient room ${user.superClient}`
+//       );
+//     }
+
+//     // // Support request handling
+//     // socket.on("supportRequest", (data) => {
+//     //   const { tableNumber, superClientId } = data;
+
+//     //   // Notify only the SuperClient
+//     //   io.to(superClientId).emit("supportNotification", { tableNumber });
+//     //   logger.info(
+//     //     `Support request for Table ${tableNumber} sent to SuperClient ${superClientId}`
+//     //   );
+//     // });
+
+//     // // Call answer handling
+//     // socket.on("supportCallAnswered", (data) => {
+//     //   const { tableNumber, superClientId } = data;
+
+//     //   // Notify only the SuperClient
+//     //   io.to(superClientId).emit("callAnswered", { tableNumber });
+//     //   logger.info(
+//     //     `Call answered for Table ${tableNumber} by SuperClient ${superClientId}`
+//     //   );
+//     // });
+
+//     socket.on("disconnect", () => {
+//       logger.info(`User ${user.fullName} disconnected`);
+//     });
+//   } catch (error) {
+//     logger.error("Invalid or expired token:", error);
+//     return socket.disconnect();
+//   }
+// });
+io.on("connection", async (socket) => {
+  const token = socket.handshake.auth.token;
+
+  if (!token) {
+    logger.warn("No token provided in socket handshake");
+    return socket.disconnect();
+  }
+
+  try {
+    const SECRET_KEY = process.env.JWT_SECRET_KEY;
+    const decoded = jwt.verify(token, SECRET_KEY);
+    const userId = decoded?.user?.id || decoded?.userId;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      logger.warn(`User with ID ${userId} not found`);
+      return socket.disconnect();
+    }
+
+    if (user.role === "superClient") {
+      // Superclient joins their own room
+      socket.join(user._id.toString());
+      logger.info(`SuperClient ${user.fullName} joined room ${user._id}`);
+    } else if (user.role === "client" && user.superClient) {
+      // Waiters join their superclient's room
+      socket.join(user.superClient.toString());
+      logger.info(
+        `Client ${user.fullName} joined superClient room ${user.superClient}`
+      );
+    }
+
+    // Support request handling
+    socket.on("supportRequest", (data) => {
+      console.log("requesting support");
+
+      const { tableNumber } = data; // Only the table number is required from the client
+      const superClientId =
+        user.role === "client" ? user.superClient : user._id; // Determine the superClientId
+
+      // Notify the SuperClient and their room
+      io.to(superClientId.toString()).emit("supportNotification", {
+        tableNumber,
+      });
+
+      logger.info(
+        `Support request for Table ${tableNumber} sent to SuperClient ${superClientId}`
+      );
+    });
+
+    // Call answer handling
+    socket.on("supportCallAnswered", (data) => {
+      const { tableNumber } = data; // Only the table number is required
+      const superClientId =
+        user.role === "client" ? user.superClient : user._id; // Determine the superClientId
+
+      // Notify the SuperClient and their room
+      io.to(superClientId.toString()).emit("callAnswered", { tableNumber });
+      logger.info(
+        `Call answered for Table ${tableNumber} by SuperClient ${superClientId}`
+      );
+    });
+
+    socket.on("disconnect", () => {
+      logger.info(`User ${user.fullName} disconnected`);
+    });
+  } catch (error) {
+    logger.error("Invalid or expired token:", error);
+    return socket.disconnect();
+  }
 });
 
 // Start the server

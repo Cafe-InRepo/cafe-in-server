@@ -96,7 +96,6 @@ const createOrder = async (req, res) => {
 
     // Populate products and table sequentially
     const populatedOrder = await newOrder.populate("products.product");
-
     await populatedOrder.populate("table");
 
     // Update the table with the new order reference
@@ -105,8 +104,10 @@ const createOrder = async (req, res) => {
 
     logger.info(`Order created successfully for table ${table._id}`);
 
-    // Emit order created event with populated order
-    req.io.emit("newOrder", populatedOrder);
+    // Emit the order to the superClient and their clients
+    const superClientId = table.superClient; // Determine from the table
+    req.io.to(superClientId.toString()).emit("newOrder", populatedOrder); // Emit to specific room
+    logger.info(`Order emitted to room ${superClientId}`);
 
     res.status(201).json({
       message: "Order created successfully",
@@ -164,7 +165,7 @@ const updateOrder = async (req, res) => {
   try {
     const orderId = req.params.orderId;
     const { products, table, status, payed, comment } = req.body;
-
+    const superClientId = req.superClientId;
     if (products && products.length === 0) {
       const deletedOrder = await Order.findByIdAndDelete(orderId);
       if (!deletedOrder) {
@@ -180,7 +181,8 @@ const updateOrder = async (req, res) => {
       });
 
       logger.info(`Order with ID ${orderId} deleted successfully`);
-      req.io.emit("newOrder", order);
+      // req.io.emit("newOrder", order);
+      req.io.to(superClientId.toString()).emit("newOrder", order); // Emit to specific room
 
       return res.status(200).json({ message: "Order deleted successfully" });
     }
@@ -204,7 +206,8 @@ const updateOrder = async (req, res) => {
       return res.status(404).json({ error: "Order not found" });
     }
     logger.info(`Order with ID ${orderId} updated successfully`);
-    req.io.emit("newOrder", order);
+    // req.io.emit("newOrder", order);
+    req.io.to(superClientId.toString()).emit("newOrder", order); // Emit to specific room
 
     res.status(200).json({ message: "Order updated successfully", order });
   } catch (error) {
@@ -219,7 +222,7 @@ const updateOrder = async (req, res) => {
 const deleteOrder = async (req, res) => {
   try {
     const orderId = req.params.orderId;
-
+    const superClientId = req.superClientId;
     const order = await Order.findById(orderId);
     if (!order) {
       logger.warn(
@@ -236,7 +239,8 @@ const deleteOrder = async (req, res) => {
     });
 
     logger.info(`Order with ID ${orderId} deleted successfully`);
-    req.io.emit("deleteOrder", order._id);
+    req.io.to(superClientId.toString()).emit("deleteOrder", order._id); // Emit to specific room
+
     console.log("deleted order id is", order._id);
     res.status(200).json({ message: "Order deleted successfully" });
   } catch (error) {
@@ -655,7 +659,7 @@ const updateOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { status } = req.body;
-
+    const superClientId = req.superClientId;
     // Validate the orderId
     if (!mongoose.Types.ObjectId.isValid(orderId)) {
       return res.status(400).json({ error: "Invalid Order ID" });
@@ -675,22 +679,60 @@ const updateOrderStatus = async (req, res) => {
     }
 
     const validTransitions = {
-      pending: "preparing",
-      preparing: "completed",
+      pending: ["preparing", "cancelled"],
+      preparing: ["completed"],
     };
-
-    if (status !== validTransitions[order.status]) {
+    if (!validTransitions[order.status]?.includes(status)) {
+      console.log("not valid transaction");
       return res.status(400).json({ error: "Invalid status transition" });
     }
 
     // Update the order status
     order.status = status;
     await order.save();
-    req.io.emit("orderUpdated", order);
+    req.io.to(superClientId.toString()).emit("orderUpdated", order); // Emit to specific room
 
     res.json({ message: "Order status updated successfully", order });
   } catch (error) {
     console.error("Error updating order status:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+//Delete all cancelled orders
+const deleteCancelledOrders = async (req, res) => {
+  try {
+    const superClientId = req.superClientId;
+
+    // Find all cancelled orders with the matching superClientId
+    const cancelledOrders = await Order.find({
+      status: "cancelled",
+      superClientId: superClientId,
+    });
+
+    if (cancelledOrders.length === 0) {
+      return res.status(404).json({ error: "No cancelled orders found" });
+    }
+
+    // Delete each cancelled order and remove its reference from the table
+    for (const order of cancelledOrders) {
+      await Order.findByIdAndDelete(order._id);
+
+      // Remove the order reference from the table
+      await Table.findByIdAndUpdate(order.table, {
+        $pull: { orders: order._id },
+      });
+
+      req.io.to(superClientId.toString()).emit("newOrder", order._id); // Emit to specific room
+      console.log("Deleted order ID is", order._id);
+    }
+
+    res.status(200).json({ message: "Cancelled orders deleted successfully" });
+  } catch (error) {
+    logger.error(
+      `Error deleting cancelled orders for superClientId ${req.superClientId}: ${error.message}`,
+      error
+    );
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -708,4 +750,5 @@ module.exports = {
   updateOrderStatus,
   confirmSelectedProductsPayments,
   tipOrder,
+  deleteCancelledOrders,
 };

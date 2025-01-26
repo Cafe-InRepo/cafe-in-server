@@ -12,11 +12,13 @@ const {
   updateOrderStatus,
   confirmSelectedProductsPayments,
   tipOrder,
+  deleteCancelledOrders,
 } = require("../controllers/OrderController");
 const decodeTableToken = require("../middleWares/decodeTableToken");
 //const verifySuperClient = require("../middleWares/VerifySuperClient");
 const verifyClientOrSuperClient = require("../middleWares/verifyClientOrSuperClient");
 const verifyToken = require("../middleWares/jerifyToken");
+const verifyClientOrSuperClientOrTable = require("../middleWares/verifyClientOrSuperClientOrTable");
 const router = express.Router();
 
 // Define routes for User model
@@ -25,14 +27,20 @@ router.post("/manual", verifyClientOrSuperClient, createOrder);
 
 router.post("/:orderId/rate", rateOrderProducts);
 router.post("/:orderId/tips", tipOrder);
-router.put("/:orderId", updateOrder);
+router.put("/:orderId", verifyClientOrSuperClientOrTable, updateOrder);
 router.patch(
   "/update-status/:orderId",
   verifyClientOrSuperClient,
   updateOrderStatus
 );
 
-router.delete("/:orderId", deleteOrder);
+router.delete("/:orderId", verifyToken, deleteOrder);
+//delete all cancelled orders for a specific superClient
+router.delete(
+  "/delete/cancelled",
+  verifyClientOrSuperClient,
+  deleteCancelledOrders
+);
 
 router.get("/:orderId", getOrder);
 router.get("/", decodeTableToken, getAllOrders);
