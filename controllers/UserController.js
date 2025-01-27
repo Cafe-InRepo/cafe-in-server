@@ -6,7 +6,7 @@ const router = express.Router();
 const User = require("../models/User");
 const Table = require("../models/Table");
 const nodemailer = require("nodemailer");
-const cloudinary = require("cloudinary").v2;
+const cloudinary = require("../Cloudinary/cloudinary");
 const logger = require("../logger"); // Import the logger
 
 const register = async (req, res) => {

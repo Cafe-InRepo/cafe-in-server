@@ -3,7 +3,8 @@ const Category = require("../models/Category");
 const Menu = require("../models/Menu");
 
 const logger = require("../logger");
-const cloudinary = require("cloudinary").v2; // Ensure cloudinary is properly configured in your project
+// const cloudinary = require("cloudinary").v2; // Ensure cloudinary is properly configured in your project
+const cloudinary = require("../Cloudinary/cloudinary");
 
 const createProduct = async (req, res) => {
   try {
@@ -36,6 +37,12 @@ const createProduct = async (req, res) => {
         )} formats are allowed.`,
       });
     }
+    console.log(
+      "Cloudinary Config:",
+      process.env.CLOUDINARY_NAME,
+      process.env.CLOUDINARY_API_KEY,
+      process.env.CLOUDINARY_API_SECRET
+    );
 
     // Upload product image to Cloudinary
     const uploadedImage = await cloudinary.uploader.upload(img, {

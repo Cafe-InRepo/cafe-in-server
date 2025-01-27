@@ -122,12 +122,13 @@ const createOrder = async (req, res) => {
 const getAllOrders = async (req, res) => {
   try {
     const tableId = req.tableId;
+
     const orders = await Order.find({
       table: tableId,
       status: { $ne: "archived" }, // Exclude orders with status 'archived'
     })
       .populate("products.product")
-      .sort({ timestamp: -1 });
+      .sort({ timestamp: 1 }); // Sort by timestamp ascending (first orders first)
 
     if (!orders || orders.length === 0) {
       logger.warn(`No orders found for table ${tableId}`);

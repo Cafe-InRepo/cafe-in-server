@@ -1,6 +1,6 @@
 const Post = require("../models/Post");
 const Customer = require("../models/Customer");
-const cloudinary = require("cloudinary").v2; // Ensure cloudinary is properly configured in your project
+const cloudinary = require("../Cloudinary/cloudinary"); // Ensure cloudinary is properly configured in your project
 const mongoose = require("mongoose");
 const User = require("../models/User");
 // Create a new post
@@ -8,7 +8,6 @@ const createPost = async (req, res) => {
   try {
     const owner = req.superClientId; // Assume this is set by middleware
     const { summary, files } = req.body; // `files` is an array of Base64 strings
-    console.log(files);
     // Validate required fields
     if (!summary) {
       return res.status(400).json({ error: "Summary is required." });
