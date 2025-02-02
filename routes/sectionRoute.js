@@ -10,9 +10,9 @@ const {
 const router = express.Router();
 
 router.post("/", verifySuperClient, createSection);
-router.get("/", getSections);
-router.get("/:sectionId", getSectionById);
-router.put("/:sectionId", updateSection);
-router.delete("/:sectionId", deleteSection);
+router.get("/", verifySuperClient, getSections);
+router.get("/:sectionId", verifySuperClient, getSectionById);
+router.put("/:sectionId", verifySuperClient, updateSection);
+router.delete("/:sectionId", verifySuperClient, deleteSection);
 
 module.exports = router;

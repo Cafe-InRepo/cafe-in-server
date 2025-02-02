@@ -25,8 +25,8 @@ const router = express.Router();
 router.post("/", decodeTableToken, createOrder);
 router.post("/manual", verifyClientOrSuperClient, createOrder);
 
-router.post("/:orderId/rate", rateOrderProducts);
-router.post("/:orderId/tips", tipOrder);
+router.post("/:orderId/rate", decodeTableToken, rateOrderProducts);
+router.post("/:orderId/tips", decodeTableToken, tipOrder);
 router.put("/:orderId", verifyClientOrSuperClientOrTable, updateOrder);
 router.patch(
   "/update-status/:orderId",
@@ -42,7 +42,7 @@ router.delete(
   deleteCancelledOrders
 );
 
-router.get("/:orderId", getOrder);
+router.get("/:orderId", decodeTableToken, getOrder);
 router.get("/", decodeTableToken, getAllOrders);
 //router.get("/client", getAllOrders);
 router.get(

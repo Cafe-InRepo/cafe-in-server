@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const Order = require("../models/Order");
-const xlsx = require("xlsx");
 const getDailyRevenue = async (req, res) => {
   const superClientId = req.superClientId;
 
@@ -407,6 +406,121 @@ const getRevenueByClient = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: "Failed to retrieve revenue by client per month",
+      error: error.message,
+    });
+  }
+};
+
+// This controller will handle the logic for fetching revenue for a specific waiter (client) within a specified period. If no waiter or dates are provided, it will default to all waiters and the current month
+const getRevenueByWaiterAndPeriod = async (req, res) => {
+  const { clientId, startDate, endDate } = req.body;
+  const superClientId = req.superClientId;
+
+  // Default to the current month if no dates are provided
+  const defaultEndDate = new Date();
+  const defaultStartDate = new Date(defaultEndDate);
+  defaultStartDate.setDate(1); // Start of the current month
+
+  const queryStartDate = startDate ? new Date(startDate) : defaultStartDate;
+  const queryEndDate = endDate ? new Date(endDate) : defaultEndDate;
+
+  try {
+    // Build the query
+    const query = {
+      superClientId,
+      status: "archived",
+      timestamp: { $gte: queryStartDate, $lte: queryEndDate },
+    };
+
+    // Add clientId to the query if provided
+    if (clientId) {
+      query.user = clientId;
+    }
+
+    // Find orders matching the query
+    const orders = await Order.find(query).populate("user", "fullName");
+
+    // Calculate revenue
+    const revenue = orders.reduce((result, order) => {
+      const clientId = order.user?._id;
+      const clientName = order.user?.fullName;
+
+      // Initialize if not already set
+      if (!result[clientId]) {
+        result[clientId] = {
+          name: clientName,
+          totalRevenue: 0,
+        };
+      }
+
+      // Add the order's totalPrice to the client's total revenue
+      result[clientId].totalRevenue += order.totalPrice;
+      return result;
+    }, {});
+
+    // Format the response
+    const formattedRevenue = Object.entries(revenue).map(
+      ([clientId, { name, totalRevenue }]) => ({
+        clientId,
+        clientName: name,
+        totalRevenue,
+      })
+    );
+
+    res.status(200).json(formattedRevenue);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to retrieve revenue by waiter and period",
+      error: error.message,
+    });
+  }
+};
+
+// This controller will fetch the daily revenue for each waiter (client) associated with a specific owner (superClient).
+const getDailyRevenuePerWaiter = async (req, res) => {
+  const superClientId = req.superClientId; // Assuming this comes from authentication
+  const { date } = req.body; // Date for which revenue is requested
+
+  // Default to today's date if no date is provided
+  const queryDate = date ? new Date(date) : new Date();
+
+  try {
+    // Find orders for the specified date and superClientId
+    const orders = await Order.find({
+      superClientId,
+      status: "archived",
+      timestamp: {
+        $gte: new Date(queryDate.setHours(0, 0, 0, 0)), // Start of the day
+        $lte: new Date(queryDate.setHours(23, 59, 59, 999)), // End of the day
+      },
+    }).populate("user", "fullName"); // Populate waiter details
+
+    // Calculate revenue per waiter
+    const revenuePerWaiter = orders.reduce((result, order) => {
+      const waiterId = order.user?._id;
+      const waiterName = order.user?.fullName;
+
+      if (!result[waiterId]) {
+        result[waiterId] = {
+          name: waiterName,
+          totalRevenue: 0,
+        };
+      }
+
+      result[waiterId].totalRevenue += order.totalPrice;
+      return result;
+    }, {});
+
+    // Format the response
+    const formattedRevenue = Object.values(revenuePerWaiter).map((waiter) => ({
+      name: waiter.name,
+      totalRevenue: waiter.totalRevenue,
+    }));
+
+    res.status(200).json(formattedRevenue);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to retrieve daily revenue per waiter",
       error: error.message,
     });
   }
@@ -908,84 +1022,6 @@ const getRevenueForCurrentYear = async (req, res) => {
   }
 };
 
-const getRevenueExcel = async (req, res) => {
-  const superClientId = req.superClientId;
-
-  if (!superClientId) {
-    return res.status(400).json({ message: "SuperClientId is required" });
-  }
-
-  if (!mongoose.Types.ObjectId.isValid(superClientId)) {
-    return res.status(400).json({ message: "Invalid SuperClientId format" });
-  }
-
-  try {
-    const currentYear = new Date().getFullYear();
-    const monthlyRevenue = Array(12).fill(0);
-
-    for (let month = 0; month < 12; month++) {
-      const startOfMonth = new Date(currentYear, month, 1);
-      const endOfMonth = new Date(currentYear, month + 1, 0, 23, 59, 59, 999);
-
-      const orders = await Order.find({
-        status: "archived",
-        timestamp: { $gte: startOfMonth, $lte: endOfMonth },
-      }).populate("table");
-
-      const filteredOrders = orders.filter((order) =>
-        order.superClientId.equals(superClientId)
-      );
-
-      const totalRevenueForMonth = filteredOrders.reduce((total, order) => {
-        return total + order.totalPrice;
-      }, 0);
-
-      monthlyRevenue[month] = totalRevenueForMonth;
-    }
-
-    const months = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ];
-
-    const formattedRevenue = months.map((monthName, index) => ({
-      Month: monthName,
-      Revenue: monthlyRevenue[index],
-    }));
-
-    // Create a new workbook and add a worksheet
-    const workbook = xlsx.utils.book_new();
-    const worksheet = xlsx.utils.json_to_sheet(formattedRevenue);
-    xlsx.utils.book_append_sheet(workbook, worksheet, "Revenue");
-
-    // Set the headers for downloading the file
-    res.setHeader("Content-Disposition", 'attachment; filename="revenue.xlsx"');
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-
-    // Write the Excel file to the response
-    const buffer = xlsx.write(workbook, { type: "buffer", bookType: "xlsx" });
-    res.send(buffer);
-  } catch (error) {
-    console.error("Error retrieving yearly revenue:", error);
-    res.status(500).json({
-      message: "Failed to retrieve yearly revenue",
-      error: error.message,
-    });
-  }
-};
 const getRevenueByProductForCurrentWeek = async (req, res) => {
   const superClientId = req.superClientId;
 
@@ -1059,18 +1095,22 @@ const getRevenueByProductForCurrentWeek = async (req, res) => {
 
 const getAverageProcessingTime = async (req, res) => {
   const { startDate, endDate } = req.body;
+  const superClientId = req.superClientId;
 
-  if (!startDate || !endDate) {
-    return res.status(400).json({
-      message: "Start date and end date are required",
-    });
-  }
+  // Set default dates if not provided
+  const defaultEndDate = new Date(); // Today's date
+  const defaultStartDate = new Date();
+  defaultStartDate.setDate(defaultEndDate.getDate() - 7); // 7 days before today
+
+  const queryStartDate = startDate ? new Date(startDate) : defaultStartDate;
+  const queryEndDate = endDate ? new Date(endDate) : defaultEndDate;
 
   try {
     // Query orders based on timestamp (within the date range)
     const orders = await Order.find({
-      timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) },
+      timestamp: { $gte: queryStartDate, $lte: queryEndDate },
       status: { $in: ["pending", "preparing", "completed"] },
+      superClientId: superClientId,
     });
 
     let pendingToPreparingDurations = [];
@@ -1120,6 +1160,70 @@ const getAverageProcessingTime = async (req, res) => {
       .json({ message: "Failed to calculate average processing time", error });
   }
 };
+const getOrderValueBreakdown = async (req, res) => {
+  const { startDate, endDate, highValueThreshold } = req.body;
+  const superClientId = req.superClientId;
+
+  if (!superClientId) {
+    return res.status(400).json({
+      message: "SuperClient ID is required",
+    });
+  }
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({
+      message: "Start date and end date are required",
+    });
+  }
+
+  try {
+    // Query only archived orders for the given superClientId within the date range
+    const orders = await Order.find({
+      timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) },
+      status: "archived",
+      superClientId: superClientId,
+    });
+
+    if (!orders.length) {
+      return res.status(200).json({
+        message:
+          "No archived orders found for the given superClient ID in the date range",
+        averageOrderValue: 0,
+        highValueOrders: [],
+      });
+    }
+
+    // Calculate total revenue and high-value orders
+    let totalOrderValue = 0;
+    const highValueOrders = [];
+
+    orders.forEach((order) => {
+      totalOrderValue += order.totalPrice;
+
+      // Check if the order qualifies as high-value
+      if (order.totalPrice >= (highValueThreshold || 100)) {
+        highValueOrders.push(order);
+      }
+    });
+
+    // Calculate average order value
+    const averageOrderValue = parseFloat(
+      (totalOrderValue / orders.length).toFixed(2)
+    );
+
+    // Return results
+    res.status(200).json({
+      averageOrderValue,
+      highValueOrders,
+    });
+  } catch (error) {
+    console.error("Error calculating orders by superClient:", error);
+    res.status(500).json({
+      message: "Failed to calculate orders by superClient",
+      error,
+    });
+  }
+};
 
 module.exports = {
   getDailyRevenue,
@@ -1131,7 +1235,6 @@ module.exports = {
   getRevenueByProductBetweenDates,
   getMonthlyRevenueForSpecificMonth,
   getRevenueForCurrentYear,
-  getRevenueExcel,
   getRevenueByProductByMonth,
   getRevenueByProductForCurrentWeek,
   getUserArchivedOrders,
@@ -1140,4 +1243,7 @@ module.exports = {
   getRevenueBetweenDates,
   getMonthlyGrowthRate,
   getAverageProcessingTime,
+  getOrderValueBreakdown,
+  getRevenueByWaiterAndPeriod,
+  getDailyRevenuePerWaiter,
 };

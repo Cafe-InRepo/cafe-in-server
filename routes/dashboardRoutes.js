@@ -17,6 +17,9 @@ const {
   getRevenueBetweenDates,
   getMonthlyGrowthRate,
   getAverageProcessingTime,
+  getOrderValueBreakdown,
+  getRevenueByWaiterAndPeriod,
+  getDailyRevenuePerWaiter,
 } = require("../controllers/DashboardingController");
 const verifySuperClient = require("../middleWares/VerifySuperClient");
 const verifyClientOrSuperClient = require("../middleWares/verifyClientOrSuperClient");
@@ -47,6 +50,16 @@ router.post(
 
 // Route to get revenue by client
 router.get("/revenue-by-client", verifySuperClient, getRevenueByClient);
+router.post(
+  "/revenue-by-waiter-and-period",
+  verifySuperClient,
+  getRevenueByWaiterAndPeriod
+);
+router.post(
+  "/daily-revenue-per-waiter",
+  verifySuperClient,
+  getDailyRevenuePerWaiter
+);
 
 // Route to get revenue by product
 router.get("/revenue-by-product", verifySuperClient, getRevenueByProduct);
@@ -60,8 +73,12 @@ router.get(
 router.get("/most-sold-products", verifySuperClient, getMostSoldProducts);
 
 router.get("/revenue-year", verifySuperClient, getRevenueForCurrentYear);
-router.post("/average-processing-time", verifySuperClient, getAverageProcessingTime);
-router.get("/revenue-csv", verifySuperClient, getRevenueExcel);
+router.post(
+  "/average-processing-time",
+  verifySuperClient,
+  getAverageProcessingTime
+);
+router.post("/average-order-value", verifySuperClient, getOrderValueBreakdown);
 router.get("/daily-receipt", verifyToken, getUserArchivedOrders);
 router.post("/close-daily", verifyToken, closeUserOrders);
 

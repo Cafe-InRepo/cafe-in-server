@@ -128,7 +128,7 @@ const getAllOrders = async (req, res) => {
       status: { $ne: "archived" }, // Exclude orders with status 'archived'
     })
       .populate("products.product")
-      .sort({ timestamp: 1 }); // Sort by timestamp ascending (first orders first)
+      .sort({ timestamp: -1 }); // Sort by timestamp ascending (first orders first)
 
     if (!orders || orders.length === 0) {
       logger.warn(`No orders found for table ${tableId}`);
