@@ -1,5 +1,7 @@
 const express = require("express");
 const verifySuperClient = require("../middleWares/VerifySuperClient");
+const verifyClientOrSuperClientOrTable = require("../middleWares/verifyClientOrSuperClientOrTable");
+
 const {
   createSection,
   getSections,
@@ -10,7 +12,7 @@ const {
 const router = express.Router();
 
 router.post("/", verifySuperClient, createSection);
-router.get("/", verifySuperClient, getSections);
+router.get("/", verifyClientOrSuperClientOrTable, getSections);
 router.get("/:sectionId", verifySuperClient, getSectionById);
 router.put("/:sectionId", verifySuperClient, updateSection);
 router.delete("/:sectionId", verifySuperClient, deleteSection);
