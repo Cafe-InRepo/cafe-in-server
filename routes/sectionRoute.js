@@ -13,7 +13,7 @@ const router = express.Router();
 
 router.post("/", verifySuperClient, createSection);
 router.get("/", verifyClientOrSuperClientOrTable, getSections);
-router.get("/:sectionId", verifySuperClient, getSectionById);
+router.get("/:sectionId", verifyClientOrSuperClientOrTable, getSectionById);
 router.put("/:sectionId", verifySuperClient, updateSection);
 router.delete("/:sectionId", verifySuperClient, deleteSection);
 

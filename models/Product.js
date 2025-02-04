@@ -59,6 +59,9 @@ const productSchema = new Schema({
     type: [productTypeSchema], // Array of product types
     default: [], // Default to an empty array if no types are provided
   },
+  discountPercentage: {
+    type: Number,
+  },
 });
 
 // Create the Product model

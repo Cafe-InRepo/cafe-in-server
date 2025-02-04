@@ -10,27 +10,45 @@ const calculateTotalPrice = async (products) => {
   const productIds = products.map((item) => item.product);
 
   const existingProducts = await Product.find({ _id: { $in: productIds } });
+
   return products.reduce((total, item) => {
     const product = existingProducts.find((p) => p._id.equals(item.product));
     if (!product) {
       logger.warn(`Product with ID ${item.product} not found in the database.`);
       return total;
     }
-    return total + product.price * item.quantity;
+
+    // Apply discount if it exists
+    const discount =
+      product.discountPercentage > 0
+        ? (product.discountPercentage / 100) * product.price
+        : 0;
+    const discountedPrice = product.price - discount;
+
+    return total + discountedPrice * item.quantity;
   }, 0);
 };
 
 const calculateTotalPriceCreating = async (products) => {
   const productIds = products.map((item) => item.product);
 
+  // Fetch all products from the database
   const existingProducts = await Product.find({ _id: { $in: productIds } });
+
+  // Calculate the total price with discounts
   return products.reduce((total, item) => {
     const product = existingProducts.find((p) => p._id.equals(item.product));
     if (!product) {
       logger.warn(`Product with ID ${item.product} not found in the database.`);
       return total;
     }
-    return total + product.price * item.quantity;
+
+    // Calculate the discounted price
+    const discountedPrice =
+      product.price * (1 - (product.discountPercentage || 0) / 100);
+
+    // Add to the total
+    return total + discountedPrice * item.quantity;
   }, 0);
 };
 

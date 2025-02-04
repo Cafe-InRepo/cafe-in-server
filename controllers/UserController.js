@@ -214,6 +214,23 @@ const getUserById = async (req, res) => {
   }
 };
 
+const getPlaceDetails = async (req, res) => {
+  try {
+    const userId = req.superClientId;
+    const user = await User.findById(userId);
+    if (!user) {
+      logger.warn(`User with ID ${userId} not found`);
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    logger.info(`Fetched data for user ${userId}`);
+    res.status(200).json(user);
+  } catch (error) {
+    logger.error("Error fetching user data:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 const uploadProfileImage = async (req, res) => {
   try {
     const image = req.body.image;
@@ -700,4 +717,5 @@ module.exports = {
   deleteUser,
   changeUserVerificationStatus,
   qrLogin,
+  getPlaceDetails
 };

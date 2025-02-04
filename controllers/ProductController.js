@@ -8,7 +8,15 @@ const cloudinary = require("../Cloudinary/cloudinary");
 
 const createProduct = async (req, res) => {
   try {
-    const { name, description, price, img, available, categoryId } = req.body;
+    const {
+      name,
+      description,
+      price,
+      img,
+      available,
+      categoryId,
+      discountPercentage,
+    } = req.body;
 
     // Validate required fields
     if (!name) {
@@ -37,12 +45,6 @@ const createProduct = async (req, res) => {
         )} formats are allowed.`,
       });
     }
-    console.log(
-      "Cloudinary Config:",
-      process.env.CLOUDINARY_NAME,
-      process.env.CLOUDINARY_API_KEY,
-      process.env.CLOUDINARY_API_SECRET
-    );
 
     // Upload product image to Cloudinary
     const uploadedImage = await cloudinary.uploader.upload(img, {
@@ -57,6 +59,7 @@ const createProduct = async (req, res) => {
       price,
       img: uploadedImage.secure_url, // Save the image URL
       available,
+      discountPercentage,
     });
 
     // Find the category and add the product to it
@@ -85,7 +88,8 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const { productId } = req.params;
-    const { name, description, price, img, available } = req.body;
+    const { name, description, price, img, available, discountPercentage } =
+      req.body;
 
     // Validate required fields
     if (!name) {
@@ -142,6 +146,7 @@ const updateProduct = async (req, res) => {
     product.price = price;
     product.img = updatedImg;
     product.available = available;
+    product.discountPercentage = discountPercentage;
 
     await product.save();
     req.io.emit("productUpdated");
