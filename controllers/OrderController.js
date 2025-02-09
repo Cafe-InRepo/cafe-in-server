@@ -399,6 +399,14 @@ const tipOrder = async (req, res) => {
     const orderId = req.params.orderId;
     const { selectedTip } = req.body;
 
+    // Check if the selectedTip is greater than 0
+    if (selectedTip <= 0) {
+      logger.warn(`Invalid tip amount ${selectedTip} for order ${orderId}`);
+      return res
+        .status(400)
+        .json({ error: "Tip amount must be greater than 0" });
+    }
+
     const order = await Order.findById(orderId);
     if (!order) {
       logger.warn(

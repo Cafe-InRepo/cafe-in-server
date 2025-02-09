@@ -90,6 +90,135 @@ const sendVerifEmail = (email, verificationCode, res, name) => {
   });
 };
 
+//change password verification code sender
+const sendChangePwdVerifCode = async (req, res) => {
+  try {
+    const { oldPassword } = req.body;
+    const superClientId = req.superClientId;
+
+    // Validate if the ID is provided
+    if (!superClientId) {
+      return res.status(400).json({ error: "SuperClient ID is missing" });
+    }
+
+    const user = await User.findById(superClientId);
+
+    // Check if user exists
+    if (!user) {
+      logger.warn(`User with ID ${superClientId} not found.`);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const email = user.email;
+
+    // Ensure email exists
+    if (!email) {
+      logger.warn(`User ${superClientId} does not have an email.`);
+      return res.status(400).json({ error: "User email is missing" });
+    }
+
+    // Verify the old password
+    const isPasswordCorrect = await bcrypt.compare(oldPassword, user.password);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({ error: "Old password is incorrect" });
+    }
+
+    // Generate a 6-digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000);
+
+    // Configure mail transporter
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: {
+        user: process.env.MAIL_SENDER_EMAIL, // Use environment variable
+        pass: process.env.MAIL_SENDER_PASS,
+      },
+    });
+
+    // Email content
+    const mailOptions = {
+      from: process.env.MAIL_SENDER_EMAIL, // Use environment variable
+      to: email,
+      subject: "Order Craft Account Password Reset",
+      text: `Hello ${user.fullName},\n\nWe've received a request to change your password. Here is your verification code: ${verificationCode}.\n\nIf you did not request this, please ignore this email.`,
+    };
+
+    // Send email
+    transporter.sendMail(mailOptions, async (error, info) => {
+      if (error) {
+        logger.error(`Failed to send verification email to ${email}:`, error);
+        return res
+          .status(500)
+          .json({ error: "Failed to send verification email" });
+      } else {
+        logger.info(
+          `Verification email sent successfully to ${email}: ${info.response}`
+        );
+
+        // Save the verification code to the user document
+        await User.updateOne(
+          { _id: superClientId }, // Find the user by their ID
+          { $set: { changePwdCode: verificationCode } } // Update the changePwdCode field
+        );
+
+        return res.status(200).json({
+          message: "Verification email sent successfully.",
+        });
+      }
+    });
+  } catch (error) {
+    logger.error("Unexpected error in sendChangePwdVerifCode:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+// change pwd after sending verification code
+const changeSuperClientPassword = async (req, res) => {
+  try {
+    const { verificationCode, newPassword, confirmPassword } = req.body;
+    const superClientId = req.superClientId;
+
+    // Validate if the ID is provided
+    if (!superClientId) {
+      return res.status(400).json({ error: "SuperClient ID is missing" });
+    }
+
+    const user = await User.findById(superClientId);
+
+    // Check if user exists
+    if (!user) {
+      logger.warn(`User with ID ${superClientId} not found.`);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if the verification code matches
+    if (user.changePwdCode !== Number(verificationCode)) {
+      return res.status(400).json({ error: "Invalid verification code" });
+    }
+
+    // Check if new passwords match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ error: "New passwords do not match" });
+    }
+
+    // Hash the new password before saving it
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Clear the verification code
+    await User.updateOne(
+      { _id: superClientId }, // Find the user by their ID
+      { password: hashedPassword },
+      { $unset: { changePwdCode: "" } } // Unset the changePwdCode field
+    );
+
+    return res.status(200).json({
+      message: "Password changed successfully.",
+    });
+  } catch (error) {
+    logger.error("Unexpected error in changePassword:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 const CodeVerification = async (req, res) => {
   try {
     const { userId, code } = req.body;
@@ -717,5 +846,7 @@ module.exports = {
   deleteUser,
   changeUserVerificationStatus,
   qrLogin,
-  getPlaceDetails
+  getPlaceDetails,
+  sendChangePwdVerifCode,
+  changeSuperClientPassword,
 };
