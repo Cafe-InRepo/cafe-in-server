@@ -81,6 +81,54 @@ const userSchema = new Schema({
       return this.role === "superClient";
     },
   },
+  changePDCode: {
+    type: Number,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
+  newEmail: {
+    type: String,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
+  NewpersonalPhoneNumber: {
+    type: Number,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
+  personalPhoneNumber: {
+    type: Number,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
+  placeLogo: {
+    type: String,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
+  placePicture: {
+    type: String,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
+  profilePicture: {
+    type: String,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
+  PlaceAddress: {
+    type: String,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
 });
 
 const User = mongoose.model("User", userSchema);

@@ -218,7 +218,156 @@ const changeSuperClientPassword = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+//send email verification for personal details change
+const sendChangePersonalDettailsVerifCode = async (req, res) => {
+  try {
+    const { newemail, newpersonalPhoneNumber } = req.body;
+    const superClientId = req.superClientId;
 
+    // Validate if the ID is provided
+    if (!superClientId) {
+      return res.status(400).json({ error: "SuperClient ID is missing" });
+    }
+
+    const user = await User.findById(superClientId);
+
+    // Check if user exists
+    if (!user) {
+      logger.warn(`User with ID ${superClientId} not found.`);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const email = user.email;
+
+    // Ensure email exists
+    if (!email) {
+      logger.warn(`User ${superClientId} does not have an email.`);
+      return res.status(400).json({ error: "User email is missing" });
+    }
+    // Check if the email or phone number has actually changed
+    if (
+      user.email === newemail &&
+      user.personalPhoneNumber === newpersonalPhoneNumber
+    ) {
+      return res
+        .status(400)
+        .json({ error: "No changes detected in email or phone number" });
+    }
+    // Validate new email format
+    const emailRegex = /^\S+@\S+\.\S+$/;
+    if (!emailRegex.test(newemail)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    // Validate phone number format (exactly 8 digits)
+    const phoneRegex = /^\d{8}$/;
+    if (!phoneRegex.test(newpersonalPhoneNumber)) {
+      return res.status(400).json({ error: "Phone number must be 8 digits" });
+    }
+
+    // Generate a 6-digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000);
+
+    // Configure mail transporter
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: {
+        user: process.env.MAIL_SENDER_EMAIL, // Use environment variable
+        pass: process.env.MAIL_SENDER_PASS,
+      },
+    });
+
+    // Email content
+    const mailOptions = {
+      from: process.env.MAIL_SENDER_EMAIL, // Use environment variable
+      to: email,
+      subject: "Order Craft Account Verification Code",
+      text: `Hello ${user.fullName},\n\nWe've received a request to change personal details. Here is your verification code: ${verificationCode}.\n\nIf you did not request this, please ignore this email.`,
+    };
+
+    // Send email
+    transporter.sendMail(mailOptions, async (error, info) => {
+      if (error) {
+        logger.error(`Failed to send verification email to ${email}:`, error);
+        return res
+          .status(500)
+          .json({ error: "Failed to send verification email" });
+      } else {
+        logger.info(
+          `Verification email sent successfully to ${email}: ${info.response}`
+        );
+        console.log(verificationCode);
+        // Save the verification code to the user document
+        await User.updateOne(
+          { _id: superClientId },
+          {
+            $set: {
+              newEmail: newemail,
+              NewpersonalPhoneNumber: newpersonalPhoneNumber,
+              changePDCode: verificationCode,
+            },
+          }
+        );
+
+        return res.status(200).json({
+          message: "Verification email sent successfully.",
+        });
+      }
+    });
+  } catch (error) {
+    logger.error("Unexpected error in sendChangePDVerifCode:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// change super client personal details
+const changeSuperClientPD = async (req, res) => {
+  try {
+    const { PDVerifCode } = req.body;
+    const superClientId = req.superClientId;
+
+    // Validate if the ID is provided
+    if (!superClientId) {
+      return res.status(400).json({ error: "SuperClient ID is missing" });
+    }
+
+    const user = await User.findById(superClientId);
+
+    // Check if user exists
+    if (!user) {
+      logger.warn(`User with ID ${superClientId} not found.`);
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if the verification code matches
+    if (user.changePDCode !== Number(PDVerifCode)) {
+      return res.status(400).json({ error: "Invalid verification code" });
+    }
+
+    // Clear the verification code
+    await User.updateOne(
+      { _id: superClientId }, // Find the user by their ID
+      {
+        $set: {
+          email: user.newEmail,
+          personalPhoneNumber: user.NewpersonalPhoneNumber,
+        },
+        $unset: {
+          newEmail: "", // Remove newEmail
+          newPersonalPhoneNumber: "", // Remove newPersonalPhoneNumber
+          changePDCode: "", // Remove changePDCode
+        },
+      }
+    );
+
+    return res.status(200).json({
+      message: "Personal Details changed successfully.",
+    });
+  } catch (error) {
+    logger.error("Unexpected error in changing personal details:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
 const CodeVerification = async (req, res) => {
   try {
     const { userId, code } = req.body;
@@ -849,4 +998,6 @@ module.exports = {
   getPlaceDetails,
   sendChangePwdVerifCode,
   changeSuperClientPassword,
+  sendChangePersonalDettailsVerifCode,
+  changeSuperClientPD,
 };

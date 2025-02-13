@@ -17,6 +17,8 @@ const {
   getPlaceDetails,
   sendChangePwdVerifCode,
   changeSuperClientPassword,
+  sendChangePersonalDettailsVerifCode,
+  changeSuperClientPD,
 } = require("../controllers/UserController");
 const verifyToken = require("../middleWares/jerifyToken");
 const verifySuperClient = require("../middleWares/VerifySuperClient");
@@ -40,6 +42,16 @@ router.post(
   "/client/change-password",
   verifySuperClient,
   changeSuperClientPassword
+);
+router.post(
+  "/client/personal-details-change",
+  verifySuperClient,
+  sendChangePersonalDettailsVerifCode
+);
+router.post(
+  "/client/verify-pd-change-code",
+  verifySuperClient,
+  changeSuperClientPD
 );
 router.post("/verifyUser", CodeVerification);
 router.post("/resendcode", resendCode);
