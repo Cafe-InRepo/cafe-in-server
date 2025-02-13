@@ -37,7 +37,23 @@ const createSection = async (req, res) => {
 
 const getSections = async (req, res) => {
   try {
-    const sections = await Section.find().populate("categories");
+    // Fetch the menu associated with the superClientId
+    const menu = await Menu.findOne({ user: req.superClientId }).populate({
+      path: "sections",
+      populate: {
+        path: "categories",
+      },
+    });
+
+    if (!menu) {
+      return res
+        .status(404)
+        .json({ error: "Menu not found for the provided superClientId" });
+    }
+
+    // Extract the populated sections from the menu
+    const sections = menu.sections;
+
     res.status(200).json(sections);
   } catch (error) {
     logger.error("Error fetching sections:", error);

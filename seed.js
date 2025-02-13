@@ -1,19 +1,22 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
-const jwt = require('jsonwebtoken');
-const User = require('./models/User');
-const Table = require('./models/Table');
-const Product = require('./models/Product');
-const Category = require('./models/Category');
-const Menu = require('./models/Menu');
-const Order = require('./models/Order');
+const jwt = require("jsonwebtoken");
+const User = require("./models/User");
+const Table = require("./models/Table");
+const Product = require("./models/Product");
+const Category = require("./models/Category");
+const Menu = require("./models/Menu");
+const Order = require("./models/Order");
 
 async function seedDatabase() {
   try {
-    await mongoose.connect('mongodb+srv://saadliwissem88:12715083w@cafein.ctsilpo.mongodb.net/?retryWrites=true&w=majority&appName=CafeIn', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect(
+      "mongodb+srv://saadliwissem88:12715083w@cafein.ctsilpo.mongodb.net/?retryWrites=true&w=majority&appName=CafeIn",
+      {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      }
+    );
 
     // Clear the existing collections
     await User.deleteMany({});
@@ -26,13 +29,39 @@ async function seedDatabase() {
     // Create users with hashed passwords
     const hashedPassword = await bcrypt.hash("password", 10);
     const superClients = await User.insertMany([
-      { fullName: "Restaurant Owner 1", email: "owner1@example.com", password: hashedPassword, verificationCode: "12345", role: "superClient" },
-      { fullName: "Restaurant Owner 2", email: "owner2@example.com", password: hashedPassword, verificationCode: "54321", role: "superClient" },
+      {
+        fullName: "Restaurant Owner 1",
+        email: "owner1@example.com",
+        password: hashedPassword,
+        verificationCode: "12345",
+        role: "superClient",
+      },
+      {
+        fullName: "Restaurant Owner 2",
+        email: "owner2@example.com",
+        password: hashedPassword,
+        verificationCode: "54321",
+        role: "superClient",
+      },
     ]);
 
     const clients = await User.insertMany([
-      { fullName: "Waiter 1", email: "waiter1@example.com", password: hashedPassword, verificationCode: "11111", role: "client", superClient: superClients[0]._id },
-      { fullName: "Waiter 2", email: "waiter2@example.com", password: hashedPassword, verificationCode: "22222", role: "client", superClient: superClients[1]._id },
+      {
+        fullName: "Waiter 1",
+        email: "waiter1@example.com",
+        password: hashedPassword,
+        verificationCode: "11111",
+        role: "client",
+        superClient: superClients[0]._id,
+      },
+      {
+        fullName: "Waiter 2",
+        email: "waiter2@example.com",
+        password: hashedPassword,
+        verificationCode: "22222",
+        role: "client",
+        superClient: superClients[1]._id,
+      },
     ]);
 
     // Create tables
@@ -89,8 +118,14 @@ async function seedDatabase() {
 
     // Create menus
     const menus = await Menu.insertMany([
-      { categories: [categories[0]._id, categories[1]._id], user: superClients[0]._id },
-      { categories: [categories[0]._id, categories[1]._id], user: superClients[1]._id },
+      {
+        categories: [categories[0]._id, categories[1]._id],
+        user: superClients[0]._id,
+      },
+      {
+        categories: [categories[0]._id, categories[1]._id],
+        user: superClients[1]._id,
+      },
     ]);
 
     // Create orders
@@ -115,5 +150,119 @@ async function seedDatabase() {
     mongoose.disconnect();
   }
 }
+// seed
+const bcrypt = require("bcrypt");
+const createSuperClientAndMenu = async () => {
+  try {
+    const hashedPassword = await bcrypt.hash("password", 10);
+    // Step 1: Create the superClient user
+    const newSuperClient = new User({
+      fullName: "Bilel Casual",
+      email: "wissem.saadli@sesame.com.tn",
+      password: hashedPassword, // Make sure to hash the password in production
+      role: "superClient",
+      phoneNumber: "93294039",
+      contractNumber: "CONTRACT123",
+      percentage: 4,
+      placeName: "Casual",
+      placeLocation: {
+        long: 40.7128,
+        lat: 74.006,
+      },
+    });
 
-seedDatabase();
+    await newSuperClient.save();
+
+    // Step 2: Create an empty menu and assign the user to it
+    const newMenu = new Menu({
+      sections: [],
+      user: newSuperClient._id, // Assign the user to the menu
+    });
+
+    await newMenu.save();
+
+    console.log("SuperClient and Menu created successfully!");
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+// createSuperClientAndMenu();
+
+const copyMenu = async (oldMenuId, newMenuId) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const oldMenu = await Menu.findById(oldMenuId)
+      .populate({
+        path: "sections",
+        populate: {
+          path: "categories",
+          populate: {
+            path: "products",
+          },
+        },
+      })
+      .session(session);
+
+    if (!oldMenu) {
+      throw new Error("Old menu not found");
+    }
+
+    const newMenu = await Menu.findById(newMenuId).session(session);
+    if (!newMenu) {
+      throw new Error("New menu not found");
+    }
+
+    const newSections = [];
+    for (const oldSection of oldMenu.sections) {
+      const newCategories = [];
+      for (const oldCategory of oldSection.categories) {
+        const newProducts = [];
+        for (const oldProduct of oldCategory.products) {
+          const newProduct = new Product({
+            name: oldProduct.name,
+            description: oldProduct.description,
+            rate: 0, // Reset rate
+            price: oldProduct.price,
+            raters: 0, // Reset raters
+            img: oldProduct.img,
+            available: oldProduct.available,
+            types: oldProduct.types,
+            discountPercentage: oldProduct.discountPercentage,
+          });
+          await newProduct.save({ session });
+          newProducts.push(newProduct._id);
+        }
+
+        const newCategory = new Category({
+          name: oldCategory.name,
+          products: newProducts,
+        });
+        await newCategory.save({ session });
+        newCategories.push(newCategory._id);
+      }
+
+      const newSection = new Section({
+        name: oldSection.name,
+        categories: newCategories,
+      });
+      await newSection.save({ session });
+      newSections.push(newSection._id);
+    }
+
+    newMenu.sections = newSections;
+    await newMenu.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+    return newMenu;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
+};
+// copyMenu("669d1becf3c2d49e40d29585","67ae689ab1025bdd3e6a5b43")
+
+// seedDatabase();

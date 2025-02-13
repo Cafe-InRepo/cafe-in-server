@@ -22,6 +22,7 @@ const postRoutes = require("./routes/postRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 
+
 dotenv.config(); // Load environment variables
 
 // Initialize express app and server
@@ -84,76 +85,6 @@ app.use("/bills", billRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/posts", postRoutes);
 
-// Socket.io connection handling
-// io.on("connection", async (socket) => {
-//   const token = socket.handshake.auth.token;
-
-//   if (!token) {
-//     logger.warn("No token provided in socket handshake");
-//     return socket.disconnect();
-//   }
-
-//   try {
-//     const SECRET_KEY = process.env.JWT_SECRET_KEY; // Secret key for JWT
-//     const decoded = jwt.verify(token, SECRET_KEY);
-
-//     // Extract user ID from token and find the user in the database
-//     const userId = decoded.user.id || decoded.userId;
-//     console.log(userId);
-//     if (decoded.role === "client") {
-//       const user = await User.findById(decoded.userId);
-//       if (user && user.superClient) {
-//         userId = user.superClient; // Assuming the superClient ID is in the user's document
-//       }
-//     }
-//     const user = await User.findById(userId);
-
-//     if (!user) {
-//       logger.warn(`User with ID ${userId} not found`);
-//       return socket.disconnect();
-//     }
-
-//     // Assign the user to the appropriate room
-//     if (user.role === "superClient") {
-//       socket.join(user._id.toString()); // SuperClient's room
-//       logger.info(`SuperClient ${user.fullName} joined room ${user._id}`);
-//     } else if (user.role === "client" && user.superClient) {
-//       socket.join(user.superClient.toString()); // Join their SuperClient's room
-//       logger.info(
-//         `Client ${user.fullName} joined superClient room ${user.superClient}`
-//       );
-//     }
-
-//     // // Support request handling
-//     // socket.on("supportRequest", (data) => {
-//     //   const { tableNumber, superClientId } = data;
-
-//     //   // Notify only the SuperClient
-//     //   io.to(superClientId).emit("supportNotification", { tableNumber });
-//     //   logger.info(
-//     //     `Support request for Table ${tableNumber} sent to SuperClient ${superClientId}`
-//     //   );
-//     // });
-
-//     // // Call answer handling
-//     // socket.on("supportCallAnswered", (data) => {
-//     //   const { tableNumber, superClientId } = data;
-
-//     //   // Notify only the SuperClient
-//     //   io.to(superClientId).emit("callAnswered", { tableNumber });
-//     //   logger.info(
-//     //     `Call answered for Table ${tableNumber} by SuperClient ${superClientId}`
-//     //   );
-//     // });
-
-//     socket.on("disconnect", () => {
-//       logger.info(`User ${user.fullName} disconnected`);
-//     });
-//   } catch (error) {
-//     logger.error("Invalid or expired token:", error);
-//     return socket.disconnect();
-//   }
-// });
 io.on("connection", async (socket) => {
   const token = socket.handshake.auth.token;
 

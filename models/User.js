@@ -77,54 +77,68 @@ const userSchema = new Schema({
   },
   changePwdCode: {
     type: Number,
+    default: 0,
     required: function () {
       return this.role === "superClient";
     },
   },
   changePDCode: {
     type: Number,
+    default: 0,
     required: function () {
       return this.role === "superClient";
     },
   },
   newEmail: {
     type: String,
+    default: "saadliwissem88@gmail.com",
     required: function () {
       return this.role === "superClient";
     },
   },
   NewpersonalPhoneNumber: {
     type: Number,
+    default: 300,
     required: function () {
       return this.role === "superClient";
     },
   },
   personalPhoneNumber: {
     type: Number,
+    default: 300,
     required: function () {
       return this.role === "superClient";
     },
   },
   placeLogo: {
     type: String,
+    default:
+      "https://th.bing.com/th/id/OIP.0rerq8e1limpB-aKYj18bAHaHa?w=151&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
     required: function () {
       return this.role === "superClient";
     },
   },
   placePicture: {
     type: String,
+    default:
+      "https://th.bing.com/th/id/OIP.0rerq8e1limpB-aKYj18bAHaHa?w=151&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
+
     required: function () {
       return this.role === "superClient";
     },
   },
   profilePicture: {
     type: String,
+    default:
+      "https://th.bing.com/th/id/OIP.0rerq8e1limpB-aKYj18bAHaHa?w=151&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7",
+
     required: function () {
       return this.role === "superClient";
     },
   },
   PlaceAddress: {
     type: String,
+    default: "Tunis, Tunisie",
     required: function () {
       return this.role === "superClient";
     },
