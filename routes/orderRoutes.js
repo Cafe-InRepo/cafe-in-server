@@ -53,7 +53,11 @@ router.get(
 
 // router.put("/:orderId/increase/:productId", increaseProductQuantity);
 // router.put("/:orderId/decrease/:productId", decreaseProductQuantity);
-router.put("/confirm/confirm-payment", verifyToken, confirmSelectedPayments);
+router.put(
+  "/confirm/confirm-payment",
+  verifyClientOrSuperClient,
+  confirmSelectedPayments
+);
 router.put(
   "/confirm/confirm-products-payment",
   verifyClientOrSuperClient,
