@@ -56,7 +56,7 @@ router.get(
 router.put("/confirm/confirm-payment", verifyToken, confirmSelectedPayments);
 router.put(
   "/confirm/confirm-products-payment",
-  verifyToken,
+  verifyClientOrSuperClient,
   confirmSelectedProductsPayments
 );
 

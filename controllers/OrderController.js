@@ -558,21 +558,20 @@ const confirmSelectedProductsPayments = async (req, res) => {
 
     if (allProductsPaid) {
       order.payed = true;
-    }
+      const superClientId = order.superClientId;
 
-    const superClientId = order.superClientId;
+      if (superClientId) {
+        const bill = await Bill.findOne({ client: superClientId });
 
-    if (superClientId) {
-      const bill = await Bill.findOne({ client: superClientId });
-
-      if (bill) {
-        const commission = totalPaidAmount * 0.04;
-        bill.totalAmount += commission;
-        await bill.save();
-      } else {
-        console.log(
-          `No bill found for superClient ${superClientId}. Payment continues without updating a bill.`
-        );
+        if (bill) {
+          const commission = order.totalPrice * 0.04;
+          bill.totalAmount += commission;
+          await bill.save();
+        } else {
+          console.log(
+            `No bill found for superClient ${superClientId}. Payment continues without updating a bill.`
+          );
+        }
       }
     }
 
