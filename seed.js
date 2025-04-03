@@ -157,17 +157,17 @@ const createSuperClientAndMenu = async () => {
     const hashedPassword = await bcrypt.hash("password", 10);
     // Step 1: Create the superClient user
     const newSuperClient = new User({
-      fullName: "Bilel Casual",
-      email: "wissem.saadli@sesame.com.tn",
+      fullName: "Mohamed Idani",
+      email: "mohamed@lumber.com",
       password: hashedPassword, // Make sure to hash the password in production
       role: "superClient",
-      phoneNumber: "93294039",
+      phoneNumber: "98904166",
       contractNumber: "CONTRACT123",
       percentage: 4,
-      placeName: "Casual",
+      placeName: "Lumber Jack",
       placeLocation: {
-        long: 40.7128,
-        lat: 74.006,
+        long: 35.1680436,
+        lat: 8.8260454,
       },
     });
 

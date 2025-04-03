@@ -432,8 +432,12 @@ const tipOrder = async (req, res) => {
 const confirmSelectedPayments = async (req, res) => {
   const { orderIds } = req.body;
   const superId = req.userId;
+
   try {
+    console.log("Received orderIds:", orderIds);
+
     if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      console.warn("No valid order IDs provided");
       return res.status(400).json({ message: "No valid order IDs provided" });
     }
 
@@ -441,7 +445,10 @@ const confirmSelectedPayments = async (req, res) => {
       mongoose.Types.ObjectId.isValid(id)
     );
 
+    console.log("Valid order IDs:", validOrderIds);
+
     if (validOrderIds.length === 0) {
+      console.warn("No valid order IDs found");
       return res.status(400).json({ message: "No valid order IDs found" });
     }
 
@@ -450,49 +457,65 @@ const confirmSelectedPayments = async (req, res) => {
       payed: false,
     }).populate("superClientId");
 
+    console.log(`Fetched ${orders.length} unpaid orders.`);
+
     if (!orders.length) {
+      console.warn("No unpaid orders found.");
       return res.status(404).json({ message: "No unpaid orders found" });
     }
 
     for (const order of orders) {
+      console.log(`Processing order ID: ${order._id}`);
+
       const superClientId = order.superClientId;
       const totalPaidAmount = order.totalPrice;
 
       if (superClientId) {
+        console.log(`Order belongs to superClient: ${superClientId}`);
+
         const bill = await Bill.findOne({ client: superClientId });
 
         if (bill) {
           const commission = totalPaidAmount * 0.04;
           bill.totalAmount += commission;
           await bill.save();
-        } else {
           console.log(
-            `No bill found for superClient ${superClientId}. Payment continues without updating a bill.`
+            `Updated bill for superClient ${superClientId}. New total: ${bill.totalAmount}`
           );
+        } else {
+          console.warn(`No bill found for superClient ${superClientId}.`);
         }
       }
 
       order.payed = true;
       order.user = superId;
       await order.save();
+      console.log(`Order ${order._id} marked as paid.`);
     }
 
     const tablesToCheck = await Order.distinct("table", {
       _id: { $in: validOrderIds },
     });
 
-    await Promise.all(
-      tablesToCheck.map(async (tableId) => {
-        const unpaidOrders = await Order.find({ table: tableId, payed: false });
+    console.log("Tables to check for archiving:", tablesToCheck);
 
-        if (unpaidOrders.length === 0) {
-          await Order.updateMany(
-            { table: tableId },
-            { $set: { status: "archived", user: superId } }
-          );
-        }
-      })
-    );
+    for (const tableId of tablesToCheck) {
+      console.log(`Checking table ${tableId} for unpaid orders.`);
+      const unpaidOrders = await Order.find({ table: tableId, payed: false });
+
+      if (unpaidOrders.length === 0) {
+        console.log(
+          `No unpaid orders left for table ${tableId}, archiving orders.`
+        );
+        await Order.updateMany(
+          { table: tableId },
+          { $set: { status: "archived" } }
+        );
+        console.log(`Orders for table ${tableId} archived.`);
+      } else {
+        console.log(`Table ${tableId} still has unpaid orders.`);
+      }
+    }
 
     res.status(200).json({
       message:
