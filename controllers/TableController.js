@@ -87,15 +87,22 @@ const deleteTable = async (req, res) => {
     // Find the table by ID and userId
     const table = await Table.findOne({
       _id: req.params.id,
-      user: req.userId,
+      superClient: req.userId,
     });
 
     if (!table) {
+      console.warn("Table not found or does not belong to user.");
       return res.status(404).send("Table not found");
     }
 
     // Delete the table
-    await Table.findByIdAndDelete(req.params.id);
+    const deleted = await Table.findByIdAndDelete(req.params.id);
+
+    if (deleted) {
+      console.log("Table deleted successfully:", deleted._id);
+    } else {
+      console.warn("Table was not deleted (possibly already removed).");
+    }
 
     res.status(204).send(); // No content response after deletion
   } catch (error) {

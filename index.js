@@ -22,7 +22,6 @@ const postRoutes = require("./routes/postRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 
-
 dotenv.config(); // Load environment variables
 
 // Initialize express app and server

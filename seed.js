@@ -266,3 +266,25 @@ const copyMenu = async (oldMenuId, newMenuId) => {
 // copyMenu("669d1becf3c2d49e40d29585","67ae689ab1025bdd3e6a5b43")
 
 // seedDatabase();
+const Bill = require("./models/Bill"); // Adjust path as needed
+
+async function createBill(clientId, totalAmount, amountPaid) {
+  try {
+    const bill = new Bill({
+      client: clientId,
+      totalAmount,
+      amountPaid,
+    });
+
+    await bill.save();
+    console.log("Bill created successfully:", bill);
+  } catch (error) {
+    console.error("Error creating bill:", error.message);
+  } finally {
+    mongoose.disconnect();
+  }
+}
+
+// Example usage (Replace 'clientId' with a valid ObjectId)
+const clientId = "67edc7bcc1a837e27b257559"; // Example ObjectId
+createBill(clientId, 0, 0);
