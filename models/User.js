@@ -143,6 +143,12 @@ const userSchema = new Schema({
       return this.role === "superClient";
     },
   },
+  defaultIP: {
+    type: String,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
 });
 
 const User = mongoose.model("User", userSchema);
