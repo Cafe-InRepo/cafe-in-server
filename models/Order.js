@@ -56,7 +56,7 @@ const orderSchema = new Schema({
   },
   timestamp: {
     type: Date,
-    default: Date.now(),
+    default: Date.now, // Remove the parentheses to make it dynamic
   },
   rated: {
     type: Boolean,

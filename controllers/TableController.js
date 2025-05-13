@@ -32,9 +32,7 @@ const createTable = async (req, res) => {
     };
 
     // Generate a JWT for the table
-    const token = jwt.sign(payload, process.env.JWT_SECRET_KEY, {
-      expiresIn: "24h",
-    });
+    const token = jwt.sign(payload, process.env.JWT_SECRET_KEY);
 
     // Generate QR code with the JWT token
     const qrCodeData = `${baseUrl}/login?token=${token}`;
@@ -448,6 +446,106 @@ const getTablesWithReservations = async (req, res) => {
       .json({ message: "Error fetching tables with reservations" });
   }
 };
+const getRevenueByTable = async (req, res) => {
+  const superClientId = req.superClientId;
+
+  try {
+    // Fetch orders with table information
+    const orders = await Order.find({
+      status: ["preparing", "completed"],
+      superClientId: superClientId,
+    }).populate("table", "number"); // Assuming 'table' is a reference to a Table model with 'number' field
+
+    // Calculate revenue by table
+    const revenueByTable = orders.reduce((result, order) => {
+      const tableNumber = order.table?.number; // Using optional chaining in case table reference is missing
+
+      if (!tableNumber) return result; // Skip if no table number
+
+      if (!result[tableNumber]) {
+        result[tableNumber] = {
+          tableNumber: tableNumber,
+          totalRevenue: 0,
+        };
+      }
+
+      // Calculate order total (products + tips)
+      const orderTotal =
+        order.products.reduce((sum, productEntry) => {
+          return (
+            sum +
+            (productEntry.productDetails?.price || 0) * productEntry.quantity
+          );
+        }, 0) + (order.tips || 0);
+
+      result[tableNumber].totalRevenue += orderTotal;
+
+      return result;
+    }, {});
+
+    // Convert to array and sort by table number (ascending)
+    const formattedRevenue = Object.values(revenueByTable).sort(
+      (a, b) => a.tableNumber - b.tableNumber
+    );
+
+    res.status(200).json(formattedRevenue);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to retrieve revenue by table",
+      error: error.message,
+    });
+  }
+};
+const getRevenueByTableArchived = async (req, res) => {
+  const superClientId = req.superClientId;
+
+  try {
+    // Fetch orders with table information
+    const orders = await Order.find({
+      status: ["archived"],
+      superClientId: superClientId,
+    }).populate("table", "number"); // Assuming 'table' is a reference to a Table model with 'number' field
+
+    // Calculate revenue by table
+    const revenueByTable = orders.reduce((result, order) => {
+      const tableNumber = order.table?.number; // Using optional chaining in case table reference is missing
+
+      if (!tableNumber) return result; // Skip if no table number
+
+      if (!result[tableNumber]) {
+        result[tableNumber] = {
+          tableNumber: tableNumber,
+          totalRevenue: 0,
+        };
+      }
+
+      // Calculate order total (products + tips)
+      const orderTotal =
+        order.products.reduce((sum, productEntry) => {
+          return (
+            sum +
+            (productEntry.productDetails?.price || 0) * productEntry.quantity
+          );
+        }, 0) + (order.tips || 0);
+
+      result[tableNumber].totalRevenue += orderTotal;
+
+      return result;
+    }, {});
+
+    // Convert to array and sort by table number (ascending)
+    const formattedRevenue = Object.values(revenueByTable).sort(
+      (a, b) => a.tableNumber - b.tableNumber
+    );
+
+    res.status(200).json(formattedRevenue);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to retrieve revenue by table",
+      error: error.message,
+    });
+  }
+};
 
 module.exports = {
   createTable,
@@ -464,4 +562,6 @@ module.exports = {
   getAllReservations,
   getTablesWithReservations,
   moveOrdersToTable,
+  getRevenueByTable,
+  getRevenueByTableArchived,
 };

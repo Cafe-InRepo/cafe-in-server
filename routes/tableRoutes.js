@@ -16,7 +16,10 @@ const {
   updateReservation,
   getTablesWithReservations,
   moveOrdersToTable,
+  getRevenueByTable,
+  getRevenueByTableArchived,
 } = require("../controllers/TableController");
+const verifySuperClient = require("../middleWares/VerifySuperClient");
 
 const router = express.Router();
 
@@ -52,5 +55,11 @@ router.put(
   verifyClientOrSuperClient,
   updateReservation
 ); // Update an existing reservation
+router.get("/guru/revenue-per-table", verifySuperClient, getRevenueByTable);
+router.get(
+  "/dashboard/revenue-per-table",
+  verifySuperClient,
+  getRevenueByTableArchived
+);
 
 module.exports = router;
