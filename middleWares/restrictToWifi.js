@@ -1,36 +1,19 @@
 const User = require("../models/User");
 module.exports = async function restrictToWifi(req, res, next) {
   try {
-    const superClientId = req.superClientId;
+    const proxyAuth = req.headers["x-proxy-auth"];
+    const localIP = req.headers["x-verified-local-ip"];
 
-    if (!superClientId) {
-      return res.status(400).json({ message: "Missing superClientId" });
+    if (proxyAuth !== process.env.SECURE_TRANSACTION_TOKEN || !localIP) {
+      return res.status(403).json({ message: "Invalid proxy request" });
     }
 
-    // Get user data from DB or service
-    const user = await User.findById(superClientId);
-
-    if (!user || !user.defaultIP) {
-      return res.status(404).json({ message: "User or default IP not found" });
+    // Optional: Check that localIP starts with a known prefix
+    if (!localIP.startsWith("192.168.0.")) {
+      return res.status(403).json({ message: "IP not from local network" });
     }
 
-    const expectedIPPrefix = user.defaultIP; // e.g., "192.168.10."
-    console.log("expected ip:", expectedIPPrefix);
-    // Get client IP
-    const clientIP =
-      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req.connection.remoteAddress ||
-      req.socket.remoteAddress;
-    console.log("retived ip: ", clientIP);
-    if (!clientIP.startsWith(expectedIPPrefix)) {
-      return res.status(403).json({
-        message: "You should be connected to the Wi-Fi.",
-        clientIP,
-        expectedPrefix: expectedIPPrefix,
-      });
-    }
-
-    next(); // All good, proceed
+    next();
   } catch (error) {
     console.error("WiFi restriction middleware error:", error);
     res.status(500).json({ message: "Internal server error" });
