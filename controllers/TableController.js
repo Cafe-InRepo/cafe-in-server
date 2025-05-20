@@ -1,6 +1,8 @@
 const { baseUrl } = require("../Helpers/BaseUrl");
 const Order = require("../models/Order");
 const Table = require("../models/Table");
+const User = require("../models/User");
+
 const jwt = require("jsonwebtoken");
 const QRCode = require("qrcode");
 
@@ -23,7 +25,13 @@ const createTable = async (req, res) => {
     });
 
     const savedTable = await newTable.save();
-
+    // Get proxy URL from user
+    const user = await User.findById(superClient);
+    if (!user || !user.proxyUrl) {
+      return res
+        .status(400)
+        .json({ error: "Proxy URL not configured for this client" });
+    }
     // Create payload for JWT, including the table number
     const payload = {
       tableId: savedTable._id,
@@ -35,7 +43,7 @@ const createTable = async (req, res) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET_KEY);
 
     // Generate QR code with the JWT token
-    const qrCodeData = `${baseUrl}/login?token=${token}`;
+    const qrCodeData = `${user.proxyUrl}/auth/scan?token=${token}`;
 
     // Generate QR Code Image (base64 data URL)
     QRCode.toDataURL(qrCodeData, async (err, url) => {

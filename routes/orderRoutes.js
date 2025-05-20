@@ -19,11 +19,10 @@ const decodeTableToken = require("../middleWares/decodeTableToken");
 const verifyClientOrSuperClient = require("../middleWares/verifyClientOrSuperClient");
 const verifyToken = require("../middleWares/jerifyToken");
 const verifyClientOrSuperClientOrTable = require("../middleWares/verifyClientOrSuperClientOrTable");
-const restrictToWifi = require("../middleWares/restrictToWifi");
 const router = express.Router();
 
 // Define routes for User model
-router.post("/", decodeTableToken, restrictToWifi, createOrder);
+router.post("/", decodeTableToken, createOrder);
 router.post("/manual", verifyClientOrSuperClient, createOrder);
 
 router.post("/:orderId/rate", decodeTableToken, rateOrderProducts);

@@ -149,6 +149,12 @@ const userSchema = new Schema({
       return this.role === "superClient";
     },
   },
+  proxyUrl: {
+    type: String,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
 });
 
 const User = mongoose.model("User", userSchema);
