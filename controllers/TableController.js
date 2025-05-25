@@ -37,13 +37,15 @@ const createTable = async (req, res) => {
       tableId: savedTable._id,
       number: savedTable.number, // Add table number to token payload
       superClient: savedTable.superClient,
+      defaultRouterIp: user.defaultIP,
     };
 
     // Generate a JWT for the table
     const token = jwt.sign(payload, process.env.JWT_SECRET_KEY);
 
     // Generate QR code with the JWT token
-    const qrCodeData = `${user.proxyUrl}/auth/scan?token=${token}`;
+    const qrCodeData = `${baseUrl}/login?token=${token}`;
+    //   const qrCodeData = `${user.proxyUrl}/auth/scan?token=${token}`;
 
     // Generate QR Code Image (base64 data URL)
     QRCode.toDataURL(qrCodeData, async (err, url) => {
