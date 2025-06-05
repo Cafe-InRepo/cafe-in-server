@@ -19,6 +19,7 @@ const {
   changeSuperClientPassword,
   sendChangePersonalDettailsVerifCode,
   changeSuperClientPD,
+  updateBusinessDetails,
 } = require("../controllers/UserController");
 const verifyToken = require("../middleWares/jerifyToken");
 const verifySuperClient = require("../middleWares/VerifySuperClient");
@@ -65,6 +66,17 @@ router.get(
   getClientsBySuperClientId
 );
 router.post("/superClient/create-user", verifySuperClient, createUser);
+router.post(
+  "/superClient/change-profile",
+  verifySuperClient,
+  uploadProfileImage
+);
+router.post(
+  "/superClient/update-business-details",
+  verifySuperClient,
+  updateBusinessDetails
+);
+
 router.delete("/superClient/:id", verifySuperClient, deleteUser);
 router.put("/superClient/:id", verifySuperClient, updateUser);
 router.patch("/superClient/:id/verify", changeUserVerificationStatus);

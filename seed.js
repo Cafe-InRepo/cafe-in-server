@@ -151,24 +151,28 @@ async function seedDatabase() {
   }
 }
 // seed
+const Menu = require("./models/Menu"); // User model
 const bcrypt = require("bcrypt");
 const createSuperClientAndMenu = async () => {
   try {
     const hashedPassword = await bcrypt.hash("password", 10);
     // Step 1: Create the superClient user
     const newSuperClient = new User({
-      fullName: "Mohamed Idani",
-      email: "mohamed@lumber.com",
+      fullName: "yassine ben amara",
+      email: "benamarayassine7@gmail.com",
       password: hashedPassword, // Make sure to hash the password in production
       role: "superClient",
-      phoneNumber: "98904166",
-      contractNumber: "CONTRACT123",
+      phoneNumber: "28795565",
+      contractNumber: "CONTRACT124",
       percentage: 4,
-      placeName: "Lumber Jack",
+      placeName: "cofe yassine",
       placeLocation: {
         long: 35.1680436,
         lat: 8.8260454,
       },
+      proxyUrl: "10.2",
+      pricingPlan: "percentage",
+      defaultIP: "192.168.0.1",
     });
 
     await newSuperClient.save();
@@ -187,7 +191,7 @@ const createSuperClientAndMenu = async () => {
   }
 };
 
-// createSuperClientAndMenu();
+//createSuperClientAndMenu();
 
 const copyMenu = async (oldMenuId, newMenuId) => {
   const session = await mongoose.startSession();

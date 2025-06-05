@@ -52,13 +52,13 @@ const userSchema = new Schema({
   placeLocation: {
     type: {
       long: {
-        type: Number,
+        type: String,
         required: function () {
           return this.role === "superClient";
         },
       },
       lat: {
-        type: Number,
+        type: String,
         required: function () {
           return this.role === "superClient";
         },
@@ -104,7 +104,7 @@ const userSchema = new Schema({
     },
   },
   personalPhoneNumber: {
-    type: Number,
+    type: String,
     default: 300,
     required: function () {
       return this.role === "superClient";
@@ -151,6 +151,13 @@ const userSchema = new Schema({
   },
   proxyUrl: {
     type: String,
+    required: function () {
+      return this.role === "superClient";
+    },
+  },
+  pricingPlan: {
+    type: String,
+    enum: ["percentage", "year", "month"],
     required: function () {
       return this.role === "superClient";
     },

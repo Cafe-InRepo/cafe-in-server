@@ -478,13 +478,23 @@ const getUserById = async (req, res) => {
   try {
     const userId = req.userId;
 
-    const user = await User.findById(userId);
+    // Ne sélectionne que les champs non sensibles à renvoyer
+    const user = await User.findById(userId).select(
+      "fullName email img role phoneNumber contractNumber percentage placeName placeLocation distance placeLogo placePicture profilePicture PlaceAddress defaultIP proxyUrl pricingPlan personalPhoneNumber"
+    );
+
     if (!user) {
       logger.warn(`User with ID ${userId} not found`);
       return res.status(404).json({ message: "User not found" });
     }
 
-    logger.info(`Fetched data for user ${userId}`);
+    // Tu peux aussi vérifier si c'est bien un superClient ici
+    if (user.role !== "superClient") {
+      logger.warn(`User with ID ${userId} is not a superClient`);
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    logger.info(`Fetched sanitized data for superClient ${userId}`);
     res.status(200).json(user);
   } catch (error) {
     logger.error("Error fetching user data:", error);
@@ -512,8 +522,28 @@ const getPlaceDetails = async (req, res) => {
 const uploadProfileImage = async (req, res) => {
   try {
     const image = req.body.image;
-    const userId = req.body.id;
+    const userId = req.superClientId;
 
+    // Check if userId exists
+    if (!userId) {
+      logger.warn("No user ID provided in request.");
+      return res.status(400).json({ error: "User ID is required." });
+    }
+
+    // Check if image is provided
+    if (!image) {
+      logger.warn(`No image provided for user ${userId}`);
+      return res.status(400).json({ error: "Image is required." });
+    }
+
+    // Check if user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      logger.warn(`User not found with ID: ${userId}`);
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    // Upload image to Cloudinary
     const uploadedImage = await cloudinary.uploader.upload(image, {
       public_id: `profile_images/${userId}`,
       overwrite: true,
@@ -521,13 +551,93 @@ const uploadProfileImage = async (req, res) => {
     });
 
     const imageUrl = uploadedImage.secure_url;
-    await User.findByIdAndUpdate(userId, { img: imageUrl });
+
+    // Update user's profile picture URL
+    await User.findByIdAndUpdate(userId, { profilePicture: imageUrl });
 
     logger.info(`Profile image uploaded successfully for user ${userId}`);
-    res.status(200).json({ message: "Profile image uploaded successfully" });
+    res.status(200).json({ message: "Profile image uploaded successfully." });
   } catch (error) {
     logger.error("Error uploading profile image:", error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Internal server error." });
+  }
+};
+
+// update business details modal
+
+const updateBusinessDetails = async (req, res) => {
+  try {
+    const {
+      placeName,
+      PlaceAddress,
+      phoneNumber,
+      distance,
+      lat,
+      long,
+      logoPreview,
+      picturePreview,
+    } = req.body.placeData;
+
+    const userId = req.superClientId;
+
+    if (!userId) {
+      logger.warn("No user ID provided in request.");
+      return res.status(400).json({ error: "User ID is required." });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      logger.warn(`User not found with ID: ${userId}`);
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    const updateData = {
+      placeName,
+      PlaceAddress,
+      phoneNumber,
+      distance,
+      placeLocation: {
+        lat,
+        long,
+      },
+    };
+
+    // Update placeLocation if both lat and long are present
+    if (lat && long && typeof lat === "number" && typeof long === "number") {
+      updateData.placeLocation = {
+        lat: lat,
+        long: long,
+      };
+    }
+
+    // Handle image uploads if provided
+    if (logoPreview) {
+      const uploadedLogo = await cloudinary.uploader.upload(logoPreview, {
+        public_id: `place_logos/${userId}`,
+        overwrite: true,
+        allowed_formats: ["jpg", "jpeg", "png"],
+      });
+      updateData.placeLogo = uploadedLogo.secure_url;
+    }
+
+    if (picturePreview) {
+      const uploadedPicture = await cloudinary.uploader.upload(picturePreview, {
+        public_id: `place_pictures/${userId}`,
+        overwrite: true,
+        allowed_formats: ["jpg", "jpeg", "png"],
+      });
+      updateData.placePicture = uploadedPicture.secure_url;
+    }
+    console.log(updateData);
+    await User.findByIdAndUpdate(userId, updateData);
+
+    logger.info(`Business details updated for user ${userId}`);
+    return res
+      .status(200)
+      .json({ message: "Business details updated successfully." });
+  } catch (error) {
+    logger.error("Error updating business details:", error);
+    return res.status(500).json({ error: "Internal server error." });
   }
 };
 
@@ -1000,4 +1110,5 @@ module.exports = {
   changeSuperClientPassword,
   sendChangePersonalDettailsVerifCode,
   changeSuperClientPD,
+  updateBusinessDetails,
 };
