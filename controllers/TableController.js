@@ -37,7 +37,7 @@ const createTable = async (req, res) => {
       tableId: savedTable._id,
       number: savedTable.number, // Add table number to token payload
       superClient: savedTable.superClient,
-      defaultRouterIp: user.defaultIP,
+      //defaultRouterIp: user.defaultIP,
     };
 
     // Generate a JWT for the table
